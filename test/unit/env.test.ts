@@ -39,6 +39,8 @@ describe("loadEnv", () => {
       WEBHOOK_SECRET: "sixteen-chars-ok",
       PRIVATE_KEY: FAKE_PEM,
       PRIVATE_KEY_PATH: undefined,
+      // Override NODE_ENV so Zod default applies regardless of vitest's NODE_ENV=test
+      NODE_ENV: "production",
       ...overrides,
     };
   }
