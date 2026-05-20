@@ -1,22 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildServer } from "../../src/server.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
+import { buildServer } from "../../src/server.js";
 
 // Minimal env subset needed by buildServer (only fields it actually uses)
 const fakeEnv: Env = {
   APP_ID: 1,
   WEBHOOK_SECRET: "test-secret-1234567890",
   PORT: 3001,
-  LOG_LEVEL: "silent",
+  LOG_LEVEL: "error",
   WEBHOOK_QUEUE_MAX: 100,
   SHUTDOWN_TIMEOUT: 5000,
   NODE_ENV: "test",
   PRIVATE_KEY: "dummy",
 };
 
-const noopLog = initLogger({ LOG_LEVEL: "silent", NODE_ENV: "test" });
+const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 
 describe("GET /healthz", () => {
   let app: FastifyInstance;
