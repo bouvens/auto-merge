@@ -1,8 +1,8 @@
 import { generateKeyPairSync } from "node:crypto";
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { http } from "msw";
 import { setupServer } from "msw/node";
 import type { Probot } from "probot";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // onUnhandledRequest:'error' proves readyzCheck makes zero network calls.
 const server = setupServer();
@@ -41,11 +41,12 @@ function makeEnv(overrides: Partial<{ PRIVATE_KEY: string }> = {}) {
 }
 
 describe("createProbot", () => {
-  it("returns a Probot instance with .webhooks property given a valid PEM", async () => {
+  it("returns a Probot instance and webhooks is accessible after ready()", async () => {
     const { createProbot } = await import("../../src/auth.js");
     const probot: Probot = createProbot(makeEnv());
     expect(probot).toBeDefined();
-    // .webhooks is the primary integration point used in server.ts (verifyAndReceive).
+    // Probot initialises webhooks asynchronously; ready() resolves once webhooks is set.
+    await probot.ready();
     expect(probot.webhooks).toBeDefined();
     expect(typeof probot.webhooks.verifyAndReceive).toBe("function");
   });
@@ -75,7 +76,7 @@ describe("readyzCheck", () => {
     const result = await readyzCheck();
     expect(result.ok).toBe(false);
     expect(typeof result.reason).toBe("string");
-    expect(result.reason!.length).toBeGreaterThan(0);
+    expect(result.reason?.length).toBeGreaterThan(0);
   });
 
   it("does not throw even when key is broken — always resolves", async () => {
