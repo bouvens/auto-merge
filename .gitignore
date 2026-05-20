@@ -1,1 +1,11 @@
 .planning/
+node_modules
+dist
+coverage
+.env
+.env.*
+*.pem
+*.key
+*.crt
+.DS_Store
+*.log

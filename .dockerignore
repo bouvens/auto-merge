@@ -1,0 +1,14 @@
+node_modules
+.git
+.env
+.env.*
+*.pem
+*.key
+*.crt
+test
+coverage
+.planning
+.claude
+README.md
+biome.json
+vitest.config.ts
