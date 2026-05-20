@@ -33,9 +33,15 @@ try {
   process.exit(1);
 }
 
+// Guards against double-shutdown when the container runtime delivers SIGTERM twice.
+let shuttingDown = false;
+
 const shutdown = async (sig: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   appLog.info({ sig }, "shutdown-start");
   try {
+    // app.close() blocks new HTTP requests before drain so no new jobs enter the queue mid-drain.
     await app?.close();
     if (queue) {
       await queue.drain(env.SHUTDOWN_TIMEOUT);
@@ -43,6 +49,7 @@ const shutdown = async (sig: string) => {
     appLog.info("shutdown-clean");
     process.exit(0);
   } catch (e) {
+    // Exit 1 so k8s restarts the pod rather than leaving a non-processing zombie.
     appLog.error({ err: e }, "shutdown-error");
     process.exit(1);
   }
