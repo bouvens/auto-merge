@@ -1,0 +1,45 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { FastifyInstance } from "fastify";
+import { buildServer } from "../../src/server.js";
+import type { Env } from "../../src/env.js";
+import { initLogger } from "../../src/log.js";
+
+// Minimal env subset needed by buildServer (only fields it actually uses)
+const fakeEnv: Env = {
+  APP_ID: 1,
+  WEBHOOK_SECRET: "test-secret-1234567890",
+  PORT: 3001,
+  LOG_LEVEL: "silent",
+  WEBHOOK_QUEUE_MAX: 100,
+  SHUTDOWN_TIMEOUT: 5000,
+  NODE_ENV: "test",
+  PRIVATE_KEY: "dummy",
+};
+
+const noopLog = initLogger({ LOG_LEVEL: "silent", NODE_ENV: "test" });
+
+describe("GET /healthz", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await buildServer({ env: fakeEnv, log: noopLog });
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("returns 200 with { status: 'ok' } regardless of auth state", async () => {
+    const response = await app.inject({ method: "GET", url: "/healthz" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ok" });
+  });
+
+  it("returns 200 even when no readyzFn is provided", async () => {
+    // healthz is always alive (D-11) — independent of readiness
+    const response = await app.inject({ method: "GET", url: "/healthz" });
+
+    expect(response.statusCode).toBe(200);
+  });
+});

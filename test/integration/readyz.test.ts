@@ -1,0 +1,74 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { FastifyInstance } from "fastify";
+import { buildServer } from "../../src/server.js";
+import type { Env } from "../../src/env.js";
+import { initLogger } from "../../src/log.js";
+
+const fakeEnv: Env = {
+  APP_ID: 1,
+  WEBHOOK_SECRET: "test-secret-1234567890",
+  PORT: 3002,
+  LOG_LEVEL: "silent",
+  WEBHOOK_QUEUE_MAX: 100,
+  SHUTDOWN_TIMEOUT: 5000,
+  NODE_ENV: "test",
+  PRIVATE_KEY: "dummy",
+};
+
+const noopLog = initLogger({ LOG_LEVEL: "silent", NODE_ENV: "test" });
+
+describe("GET /readyz", () => {
+  let app: FastifyInstance;
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("returns 503 with reason 'readyz-not-wired' when no readyzFn provided", async () => {
+    // Default fallback — readyz is intentionally degraded until server wires a real check (Plan 05)
+    app = await buildServer({ env: fakeEnv, log: noopLog });
+
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ status: "not-ready", reason: "readyz-not-wired" });
+  });
+
+  it("returns 200 when readyzFn resolves { ok: true }", async () => {
+    const readyzFn = async () => ({ ok: true as const });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: "ready" });
+  });
+
+  it("returns 503 with forwarded reason when readyzFn resolves { ok: false }", async () => {
+    const readyzFn = async () => ({ ok: false as const, reason: "jwt-expired" });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ status: "not-ready", reason: "jwt-expired" });
+  });
+
+  it("returns 503 when readyzFn resolves { ok: false } without reason", async () => {
+    const readyzFn = async () => ({ ok: false as const });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+
+    const response = await app.inject({ method: "GET", url: "/readyz" });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ status: "not-ready" });
+  });
+
+  it("POST /webhook returns 404 (route not registered until Plan 05)", async () => {
+    app = await buildServer({ env: fakeEnv, log: noopLog });
+
+    const response = await app.inject({ method: "POST", url: "/webhook", body: "{}" });
+
+    expect(response.statusCode).toBe(404);
+  });
+});
