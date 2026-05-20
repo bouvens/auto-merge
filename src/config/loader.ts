@@ -1,8 +1,8 @@
-import { parseDocument, LineCounter } from "yaml";
-import { LRUCache } from "lru-cache";
 import type { Octokit } from "@octokit/core";
-import { ConfigSchema, type Config } from "./schema.js";
+import { LRUCache } from "lru-cache";
+import { LineCounter, parseDocument } from "yaml";
 import { log } from "../log.js";
+import { type Config, ConfigSchema } from "./schema.js";
 
 export interface ConfigError {
   line: number;
@@ -60,18 +60,17 @@ export async function loadConfig(deps: {
   let text: string;
   try {
     // octokit.request avoids coupling to a specific @octokit/rest plugin version from Probot.
-    const resp = await deps.octokit.request(
-      "GET /repos/{owner}/{repo}/contents/{path}",
-      {
-        owner: deps.owner,
-        repo: deps.repo,
-        path: ".github/auto-merge.yml",
-        ref: deps.sha,
-      },
-    );
+    const resp = await deps.octokit.request("GET /repos/{owner}/{repo}/contents/{path}", {
+      owner: deps.owner,
+      repo: deps.repo,
+      path: ".github/auto-merge.yml",
+      ref: deps.sha,
+    });
     const data = resp.data as { content?: string; encoding?: string };
     if (!data.content || data.encoding !== "base64") {
-      const errors: ConfigError[] = [{ line: 1, col: 1, message: "config file not found or not a file" }];
+      const errors: ConfigError[] = [
+        { line: 1, col: 1, message: "config file not found or not a file" },
+      ];
       await createInvalidConfigCheckRun(deps, errors);
       return { errors };
     }
@@ -79,7 +78,9 @@ export async function loadConfig(deps: {
     text = Buffer.from(data.content.replace(/\n/g, ""), "base64").toString("utf8");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const errors: ConfigError[] = [{ line: 1, col: 1, message: `failed to fetch config: ${message}` }];
+    const errors: ConfigError[] = [
+      { line: 1, col: 1, message: `failed to fetch config: ${message}` },
+    ];
     await createInvalidConfigCheckRun(deps, errors);
     return { errors };
   }

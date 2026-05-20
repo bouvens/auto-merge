@@ -1,13 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { createProbot, readyzCheck } from "./auth.js";
 import { loadEnv } from "./env.js";
-import { initLogger } from "./log.js";
+import { initLogger, log } from "./log.js";
 import { buildServer } from "./server.js";
+import { dedup } from "./webhook/dedup.js";
+import { createQueue } from "./webhook/queue.js";
 
 const env = loadEnv();
-const log = initLogger(env);
+const appLog = initLogger(env);
 
 let app: FastifyInstance | undefined;
+let queue: ReturnType<typeof createQueue<{ name: string }>> | undefined;
 
 try {
   const probot = createProbot(env);
@@ -15,23 +18,32 @@ try {
   // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
   await probot.ready();
 
-  app = await buildServer({ env, log, readyzFn: readyzCheck, probot });
+  queue = createQueue<{ name: string }>({
+    max: env.WEBHOOK_QUEUE_MAX,
+    handler: async (job) => {
+      log.info({ delivery_id: job.id, name: job.payload.name }, "cascade-placeholder");
+    },
+  });
+
+  app = await buildServer({ env, log: appLog, readyzFn: readyzCheck, probot, dedup, queue });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  log.info({ port: env.PORT }, "listening");
+  appLog.info({ port: env.PORT }, "listening");
 } catch (e) {
-  log.fatal({ err: e }, "boot-failed");
+  appLog.fatal({ err: e }, "boot-failed");
   process.exit(1);
 }
 
 const shutdown = async (sig: string) => {
-  log.info({ sig }, "shutdown-start");
+  appLog.info({ sig }, "shutdown-start");
   try {
     await app?.close();
-    // Queue drain wired in Plan 07 (depends on src/webhook/queue.ts from Plan 05)
-    log.info("shutdown-clean");
+    if (queue) {
+      await queue.drain(env.SHUTDOWN_TIMEOUT);
+    }
+    appLog.info("shutdown-clean");
     process.exit(0);
   } catch (e) {
-    log.error({ err: e }, "shutdown-error");
+    appLog.error({ err: e }, "shutdown-error");
     process.exit(1);
   }
 };

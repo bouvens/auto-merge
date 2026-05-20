@@ -4,9 +4,15 @@ import { z } from "zod";
 const NotificationsSchema = z
   .object({
     // channel required when slack block is present — natural enforcement through nested required field (CFG-06).
-    slack: z.object({ channel: z.string().min(1) }).strict().optional(),
+    slack: z
+      .object({ channel: z.string().min(1) })
+      .strict()
+      .optional(),
     // chat_id required when telegram block is present — same pattern as slack (CFG-06).
-    telegram: z.object({ chat_id: z.string().min(1) }).strict().optional(),
+    telegram: z
+      .object({ chat_id: z.string().min(1) })
+      .strict()
+      .optional(),
   })
   .strict()
   .optional();

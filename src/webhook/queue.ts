@@ -23,7 +23,7 @@ export function createQueue<T>(opts: { max: number; handler: Handler<T> }): Queu
     if (running) return;
     running = true;
     while (buf.length > 0) {
-      const job = buf.shift()!;
+      const job = buf.shift() as Job<T>;
       try {
         await opts.handler(job);
       } catch (err) {
@@ -31,13 +31,13 @@ export function createQueue<T>(opts: { max: number; handler: Handler<T> }): Queu
       }
     }
     running = false;
-    drainResolvers.splice(0).forEach((r) => r());
+    for (const resolve of drainResolvers.splice(0)) resolve();
   };
 
   return {
     enqueue(job) {
       if (buf.length >= opts.max) {
-        const dropped = buf.shift()!;
+        const dropped = buf.shift() as Job<T>;
         log.warn(
           { event: "queue_overflow", dropped_delivery_id: dropped.id, queue_max: opts.max },
           "drop-oldest",

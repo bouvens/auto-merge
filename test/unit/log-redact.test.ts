@@ -44,7 +44,10 @@ describe("pino redact", () => {
 
   it("redacts x-hub-signature-256 and authorization headers", async () => {
     const { logger, lines } = await makeLogger();
-    logger.info({ headers: { "x-hub-signature-256": "sha256=abc", authorization: "Bearer xyz" } }, "msg");
+    logger.info(
+      { headers: { "x-hub-signature-256": "sha256=abc", authorization: "Bearer xyz" } },
+      "msg",
+    );
     const out = JSON.parse(lines[0] ?? "{}") as { headers: Record<string, unknown> };
     expect(out.headers["x-hub-signature-256"]).toBe("[REDACTED]");
     expect(out.headers["authorization"]).toBe("[REDACTED]");

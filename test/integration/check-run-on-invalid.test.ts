@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { setupServer } from "msw/node";
-import { http, HttpResponse } from "msw";
 import { Octokit } from "@octokit/core";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/loader.js";
 
 // Invalid YAML — tab at start of line causes a parse error.

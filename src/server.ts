@@ -3,6 +3,9 @@ import rawBodyPlugin from "fastify-raw-body";
 import type pino from "pino";
 import type { Probot } from "probot";
 import type { Env } from "./env.js";
+import { log } from "./log.js";
+import { registerHandlers } from "./webhook/handler.js";
+import type { Queue } from "./webhook/queue.js";
 
 export interface BuildServerDeps {
   env: Env;
@@ -11,6 +14,8 @@ export interface BuildServerDeps {
   readyzFn?: () => Promise<{ ok: boolean; reason?: string }>;
   // Optional: Plan 05 will use this to register /webhook route
   probot?: Probot;
+  dedup?: { seen(id: string): boolean; mark(id: string): void };
+  queue?: Queue<{ name: string }>;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -46,6 +51,55 @@ export async function buildServer(deps: BuildServerDeps) {
 
     return { status: "ready" };
   });
+
+  if (deps.probot && deps.dedup && deps.queue) {
+    registerHandlers(deps.probot);
+
+    const { probot, dedup, queue } = deps;
+
+    // config.rawBody:true opts this route into raw body capture; verifyAndReceive requires the unparsed string for HMAC.
+    app.post("/webhook", { config: { rawBody: true } }, async (req, reply) => {
+      const id = req.headers["x-github-delivery"] as string | undefined;
+      const name = req.headers["x-github-event"] as string | undefined;
+      const signature = req.headers["x-hub-signature-256"] as string | undefined;
+
+      if (!id || !name || !signature) {
+        return reply.code(400).send();
+      }
+
+      // verifyAndReceive (not receive) performs HMAC verification and fires probot.on() handlers (D-15, C-02).
+      try {
+        await probot.webhooks.verifyAndReceive({
+          id,
+          name: name as never,
+          signature,
+          payload: req.rawBody as string,
+        });
+      } catch (err) {
+        // @octokit/webhooks wraps the signature-mismatch Error in an AggregateError; the inner error carries status:400
+        const inner = (err instanceof AggregateError ? err.errors[0] : err) as { status?: number };
+        if (inner.status === 400) {
+          return reply.code(401).send();
+        }
+        log.error({ err, delivery_id: id }, "webhook-process-error");
+        return reply.code(500).send();
+      }
+
+      // Dedup runs after HMAC verify to prevent cache poisoning by unauthenticated senders.
+      if (dedup.seen(id)) {
+        log.info({ delivery_id: id, event: name }, "webhook-duplicate");
+        return reply.code(202).send();
+      }
+      dedup.mark(id);
+
+      // Only enqueue events that trigger cascade logic; lifecycle events are handled inside verifyAndReceive via probot.on().
+      if (name === "push" || name === "repository_dispatch") {
+        queue.enqueue({ id, payload: { name } });
+      }
+
+      return reply.code(202).send();
+    });
+  }
 
   return app;
 }
