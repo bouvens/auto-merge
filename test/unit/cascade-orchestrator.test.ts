@@ -147,7 +147,7 @@ describe("runCascade", () => {
     expect(mergeStepMock).not.toHaveBeenCalled();
     expect(completeFailureMock).not.toHaveBeenCalled();
     const errorEvents = errorSpy.mock.calls
-      .map((c) => (c[0] as { event?: string })?.event)
+      .map((c: unknown[]) => (c[0] as { event?: string })?.event)
       .filter(Boolean);
     expect(errorEvents).toContain("cascade_failed");
   });
@@ -160,7 +160,7 @@ describe("runCascade", () => {
 
     await expect(runCascade(job())).resolves.toBeUndefined();
     const errorEvents = errorSpy.mock.calls
-      .map((c) => (c[0] as { event?: string })?.event)
+      .map((c: unknown[]) => (c[0] as { event?: string })?.event)
       .filter(Boolean);
     expect(errorEvents).toContain("cascade_failed");
   });
@@ -186,7 +186,7 @@ describe("runCascade", () => {
     await runCascade(job());
 
     const started = infoSpy.mock.calls.find(
-      (c) => (c[0] as { event?: string })?.event === "cascade_started",
+      (c: unknown[]) => (c[0] as { event?: string })?.event === "cascade_started",
     );
     expect(started).toBeDefined();
     const runId = (started![0] as { run_id: string }).run_id;
