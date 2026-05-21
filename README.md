@@ -145,6 +145,44 @@ The following features land in later phases:
 - **Phase 3:** Per-repository lock manager and cron safety-net
 - **Phase 4:** Slack and Telegram conflict notifications
 
+## Graceful Shutdown
+
+On `SIGTERM` or `SIGINT` the App executes this shutdown sequence:
+
+| Step | Action | Budget |
+|---|---|---|
+| 1 | Stop the cron scheduler (waits for any running tick to finish) | ≤ 5 s |
+| 2 | Stop accepting new HTTP requests (Fastify close) | ≈ instant |
+| 3 | Drain per-repo queues — wait for in-flight cascades to finish | ≤ `SHUTDOWN_TIMEOUT` (default 30 s) |
+| 4 | `exit 0` | — |
+
+Total time before the process exits: **≤ `SHUTDOWN_TIMEOUT` + 5 s** (≤ 35 s with defaults).
+
+**Drain timeout is not an error.** If in-flight cascades are still running when the timeout expires, the App logs `multi_queue_drain_timeout` and exits 0. The next cron tick (default every 10 min) picks up any missed work via the safety-net sweep.
+
+**SIGKILL cannot be caught.** A hard kill drops all in-flight cascades immediately. This is a documented limitation; the next cron tick recovers missed work, but any cascade interrupted mid-merge stays where the GitHub server left it (server-side merge is atomic — the commit either landed or it didn't).
+
+### Container Grace Period
+
+The container runtime must wait long enough for the shutdown sequence to complete before sending SIGKILL.
+
+**Docker:**
+
+```bash
+docker run --stop-timeout=60 ...
+```
+
+The default `--stop-timeout` is 10 s, which is shorter than the 35 s budget above. Without this flag Docker sends SIGKILL before the queue drains.
+
+**Kubernetes:**
+
+```yaml
+spec:
+  terminationGracePeriodSeconds: 60   # must exceed SHUTDOWN_TIMEOUT + 5s
+```
+
+The default `terminationGracePeriodSeconds` is 30 s, which equals `SHUTDOWN_TIMEOUT` but leaves no room for the cron stop budget. Set it to at least `SHUTDOWN_TIMEOUT + 10` to be safe.
+
 ## Manual Trigger via workflow_dispatch
 
 Use this when webhooks are delayed or you want to force a cascade on the current `main` HEAD without pushing a new commit.
