@@ -1,7 +1,7 @@
 import type { Octokit } from "@octokit/core";
 import { LRUCache } from "lru-cache";
 import { LineCounter, parseDocument } from "yaml";
-import { log } from "../log.js";
+import { createFailureCheckRun } from "../cascade/checkRun.js";
 import { type Config, ConfigSchema } from "./schema.js";
 
 export interface ConfigError {
@@ -95,28 +95,18 @@ export async function loadConfig(deps: {
   return result;
 }
 
+// Delegates to shared helper — failure-Check-Run shape is identical across config (CFG-05) and cascade (OBS-01) so we keep one POST path with error swallowing.
 async function createInvalidConfigCheckRun(
   deps: { octokit: Octokit; owner: string; repo: string; sha: string },
   errors: ConfigError[],
 ): Promise<void> {
-  try {
-    await deps.octokit.request("POST /repos/{owner}/{repo}/check-runs", {
-      owner: deps.owner,
-      repo: deps.repo,
+  await createFailureCheckRun(
+    { octokit: deps.octokit, owner: deps.owner, repo: deps.repo },
+    {
       head_sha: deps.sha,
       name: "auto-merge / config",
-      status: "completed",
-      conclusion: "failure",
-      output: {
-        title: "Invalid .github/auto-merge.yml",
-        summary: errors.map((e) => `- L${e.line}:${e.col} — ${e.message}`).join("\n"),
-      },
-    });
-  } catch (err) {
-    // Swallow check-run failures — loader must not throw when monitoring is unavailable.
-    log.error(
-      { err, owner: deps.owner, repo: deps.repo, sha: deps.sha },
-      "check-run-create-failed",
-    );
-  }
+      title: "Invalid .github/auto-merge.yml",
+      summary: errors.map((e) => `- L${e.line}:${e.col} — ${e.message}`).join("\n"),
+    },
+  );
 }
