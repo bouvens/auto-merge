@@ -8,6 +8,10 @@ const Base = z.object({
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   WEBHOOK_QUEUE_MAX: z.coerce.number().int().positive().default(1000),
   SHUTDOWN_TIMEOUT: z.coerce.number().int().positive().default(30000),
+  WEBHOOK_QUEUE_PER_KEY_MAX: z.coerce.number().int().positive().default(16),
+  // Empty string signals cron-disabled (D-06); syntax not validated here — croner throws at construction with a clearer error.
+  CRON_SCHEDULE: z.string().default("*/10 * * * *"),
+  CRON_TZ: z.string().default("UTC"),
   SLACK_WEBHOOK_URL: z.url().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
