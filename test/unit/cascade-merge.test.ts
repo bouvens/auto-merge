@@ -73,9 +73,7 @@ describe("mergeStep", () => {
     const createSpy = vi
       .spyOn(checkRunModule, "createInProgress")
       .mockResolvedValue({ check_run_id: 42, html_url: "https://gh/cr/42" });
-    const completeSpy = vi
-      .spyOn(checkRunModule, "completeSuccess")
-      .mockResolvedValue(undefined);
+    const completeSpy = vi.spyOn(checkRunModule, "completeSuccess").mockResolvedValue(undefined);
 
     const result = await mergeStep(baseDeps(octokit), baseOpts);
 
@@ -189,9 +187,7 @@ describe("mergeStep", () => {
       check_run_id: 11,
       html_url: "https://gh/cr/11",
     });
-    const completeSpy = vi
-      .spyOn(checkRunModule, "completeSuccess")
-      .mockResolvedValue(undefined);
+    const completeSpy = vi.spyOn(checkRunModule, "completeSuccess").mockResolvedValue(undefined);
 
     const result = await mergeStep(baseDeps(octokit), baseOpts);
 
