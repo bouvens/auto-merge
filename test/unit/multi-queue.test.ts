@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { log } from "../../src/log.js";
 import { createMultiQueue } from "../../src/webhook/multiQueue.js";
 import type { Job } from "../../src/webhook/queue.js";
-import { log } from "../../src/log.js";
 
 const makeNotify = () => ({ notify: vi.fn().mockResolvedValue(undefined) });
 
@@ -215,7 +215,10 @@ describe("createMultiQueue", () => {
     await drainPromise;
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "multi_queue_drain_timeout", remaining_keys: ["key-stuck"] }),
+      expect.objectContaining({
+        event: "multi_queue_drain_timeout",
+        remaining_keys: ["key-stuck"],
+      }),
       "drain-timeout",
     );
 

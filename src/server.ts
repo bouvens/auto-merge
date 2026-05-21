@@ -2,22 +2,22 @@ import Fastify from "fastify";
 import rawBodyPlugin from "fastify-raw-body";
 import type pino from "pino";
 import type { Probot } from "probot";
-import type { PushJob } from "./cascade/orchestrator.js";
+import type { CascadeJob } from "./cascade/orchestrator.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
 import { registerHandlers } from "./webhook/handler.js";
+import type { MultiQueue } from "./webhook/multiQueue.js";
 import { registerPushHandler } from "./webhook/pushHandler.js";
-import type { Queue } from "./webhook/queue.js";
 
 export interface BuildServerDeps {
   env: Env;
   log: pino.Logger;
   // Optional: wired by index.ts after probot.ready(); absence → 503 "readyz-not-wired"
   readyzFn?: () => Promise<{ ok: boolean; reason?: string }>;
-  // Optional: Plan 05 will use this to register /webhook route
+  // Optional: registered once probot is ready
   probot?: Probot;
   dedup?: { seen(id: string): boolean; mark(id: string): void };
-  queue?: Queue<PushJob>;
+  queue?: MultiQueue<CascadeJob>;
 }
 
 export async function buildServer(deps: BuildServerDeps) {

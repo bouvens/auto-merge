@@ -67,6 +67,7 @@ function makeHeadCommit(overrides: Partial<PushHeadCommit> = {}): PushHeadCommit
 
 function makeJob(overrides: Partial<PushJob> = {}): Job<PushJob> {
   const payload: PushJob = {
+    source: "push",
     installation_id: 42,
     owner: "acme",
     repo: "widgets",

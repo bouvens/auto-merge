@@ -1,14 +1,14 @@
 import type { Probot } from "probot";
 import { getBotIdentity } from "../auth.js";
 import { checkLoop } from "../cascade/loopPrevention.js";
-import type { PushJob } from "../cascade/orchestrator.js";
+import type { CascadeJob, PushJob } from "../cascade/orchestrator.js";
 import { sourceShaDedup } from "../cascade/sourceShaDedup.js";
 import { loadConfig } from "../config/loader.js";
 import { log } from "../log.js";
-import type { Queue } from "./queue.js";
+import { buildKey, type MultiQueue } from "./multiQueue.js";
 
 export interface PushHandlerDeps {
-  queue: Queue<PushJob>;
+  queue: MultiQueue<CascadeJob>;
 }
 
 interface PushPayloadShape {
@@ -88,6 +88,7 @@ export async function handlePushEvent(ctx: PushContext, deps: PushHandlerDeps): 
   sourceShaDedup.mark(dedupKey);
 
   const job: PushJob = {
+    source: "push",
     installation_id: payload.installation.id,
     owner,
     repo,
@@ -107,7 +108,7 @@ export async function handlePushEvent(ctx: PushContext, deps: PushHandlerDeps): 
     config,
   };
 
-  deps.queue.enqueue({ id: delivery_id, payload: job });
+  deps.queue.enqueue(buildKey(job), { id: delivery_id, payload: job });
   log.info({ delivery_id, owner, repo, branch, source_sha: after, event: "push_enqueued" }, "push");
 }
 
