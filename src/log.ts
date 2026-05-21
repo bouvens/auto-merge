@@ -21,6 +21,10 @@ const REDACT_PATHS = [
   "*.webhookUrl",
   'headers["x-hub-signature-256"]',
   "headers.authorization",
+  "payload",
+  "*.payload",
+  "err.event.payload",
+  "event.payload",
 ];
 
 export type LogDestination = { write: (chunk: string) => void };

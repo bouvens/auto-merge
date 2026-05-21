@@ -13,13 +13,19 @@ const Base = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
 });
 
-// z.xor enforces exactly one variant — before Zod 4 this required superRefine.
-const KeyXor = z.xor([
-  z.object({ PRIVATE_KEY: z.string().min(1), PRIVATE_KEY_PATH: z.undefined() }),
-  z.object({ PRIVATE_KEY: z.undefined(), PRIVATE_KEY_PATH: z.string().min(1) }),
-]);
+// z.xor with z.undefined() rejects absent process.env keys as nonoptional.
+const KeyFields = z.object({
+  PRIVATE_KEY: z.string().min(1).optional(),
+  PRIVATE_KEY_PATH: z.string().min(1).optional(),
+});
 
-const EnvSchema = Base.and(KeyXor);
+const EnvSchema = Base.extend(KeyFields.shape).refine(
+  (e) => (e.PRIVATE_KEY ? 1 : 0) + (e.PRIVATE_KEY_PATH ? 1 : 0) === 1,
+  {
+    message: "Exactly one of PRIVATE_KEY or PRIVATE_KEY_PATH must be set",
+    path: ["PRIVATE_KEY"],
+  },
+);
 
 // PRIVATE_KEY is always a resolved string after loadEnv, regardless of which source was used.
 export type Env = Omit<z.infer<typeof EnvSchema>, "PRIVATE_KEY" | "PRIVATE_KEY_PATH"> & {

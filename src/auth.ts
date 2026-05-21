@@ -1,8 +1,24 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Probot } from "probot";
 import type { Env } from "./env.js";
+import { log } from "./log.js";
 
-// Separate from Probot because Probot does not expose a clean appAuth() method needed for /readyz.
+export function attachWebhookErrorRedactor(probot: Probot): void {
+  probot.webhooks.onError((err) => {
+    const inner =
+      err instanceof AggregateError ? (err.errors[0] as Error) : err;
+    const isSigMismatch = inner?.message?.includes("signature does not match");
+    log.warn(
+      {
+        kind: isSigMismatch ? "signature-mismatch" : "webhook-error",
+        msg: inner?.message,
+      },
+      "webhook-rejected",
+    );
+  });
+}
+
+// Probot's appAuth is not directly reachable; we mint our own for /readyz JWT signing.
 let appAuth: ReturnType<typeof createAppAuth> | undefined;
 
 export function createProbot(env: Env): Probot {
@@ -10,7 +26,7 @@ export function createProbot(env: Env): Probot {
     appId: env.APP_ID,
     privateKey: env.PRIVATE_KEY,
     secret: env.WEBHOOK_SECRET,
-    // No port or webhookProxy — Fastify owns the HTTP server (D-01/D-02).
+    log,
   });
 
   appAuth = createAppAuth({

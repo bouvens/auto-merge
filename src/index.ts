@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createProbot, readyzCheck } from "./auth.js";
+import { attachWebhookErrorRedactor, createProbot, readyzCheck } from "./auth.js";
 import { loadEnv } from "./env.js";
 import { initLogger, log } from "./log.js";
 import { buildServer } from "./server.js";
@@ -17,6 +17,7 @@ try {
 
   // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
   await probot.ready();
+  attachWebhookErrorRedactor(probot);
 
   queue = createQueue<{ name: string }>({
     max: env.WEBHOOK_QUEUE_MAX,
