@@ -158,4 +158,57 @@ describe("loadEnv", () => {
       }
     }
   });
+
+  describe("Phase 3 env fields (D-23)", () => {
+    it("applies defaults: WEBHOOK_QUEUE_PER_KEY_MAX=16, CRON_SCHEDULE='*/10 * * * *', CRON_TZ='UTC'", async () => {
+      setValidInlineEnv();
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.WEBHOOK_QUEUE_PER_KEY_MAX).toBe(16);
+      expect(env.CRON_SCHEDULE).toBe("*/10 * * * *");
+      expect(env.CRON_TZ).toBe("UTC");
+    });
+
+    it("rejects WEBHOOK_QUEUE_PER_KEY_MAX=0 (must be positive)", async () => {
+      setValidInlineEnv({ WEBHOOK_QUEUE_PER_KEY_MAX: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects WEBHOOK_QUEUE_PER_KEY_MAX=-1 (must be positive)", async () => {
+      setValidInlineEnv({ WEBHOOK_QUEUE_PER_KEY_MAX: "-1" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects WEBHOOK_QUEUE_PER_KEY_MAX='abc' (non-numeric)", async () => {
+      setValidInlineEnv({ WEBHOOK_QUEUE_PER_KEY_MAX: "abc" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("accepts CRON_SCHEDULE='' (empty string disables cron, D-06)", async () => {
+      setValidInlineEnv({ CRON_SCHEDULE: "" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.CRON_SCHEDULE).toBe("");
+    });
+
+    it("accepts custom WEBHOOK_QUEUE_PER_KEY_MAX", async () => {
+      setValidInlineEnv({ WEBHOOK_QUEUE_PER_KEY_MAX: "32" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.WEBHOOK_QUEUE_PER_KEY_MAX).toBe(32);
+    });
+
+    it("accepts custom CRON_TZ", async () => {
+      setValidInlineEnv({ CRON_TZ: "America/New_York" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.CRON_TZ).toBe("America/New_York");
+    });
+  });
 });

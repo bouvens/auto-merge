@@ -93,6 +93,17 @@ export function getBotIdentity(): { login: string; email: string } {
   return botIdentity;
 }
 
+// Omits installationId — @octokit/auth-app signs an app-JWT for /app/* without an installation scope.
+export function getAppOctokit(): InstanceType<typeof Octokit> {
+  if (!bootEnv) {
+    throw new Error("auth not initialised — call createProbot first");
+  }
+  return new Octokit({
+    authStrategy: createAppAuth,
+    auth: { appId: bootEnv.APP_ID, privateKey: bootEnv.PRIVATE_KEY },
+  });
+}
+
 // per-call Octokit; @octokit/auth-app handles installation-token caching with 1h TTL (D-30, RESEARCH.md Octokit Instance Strategy).
 export async function getInstallationOctokit(
   installationId: number,

@@ -35,6 +35,9 @@ function makeEnv(overrides: Partial<{ PRIVATE_KEY: string }> = {}) {
     LOG_LEVEL: "info" as const,
     WEBHOOK_QUEUE_MAX: 1000,
     SHUTDOWN_TIMEOUT: 30000,
+    WEBHOOK_QUEUE_PER_KEY_MAX: 16,
+    CRON_SCHEDULE: "*/10 * * * *",
+    CRON_TZ: "UTC",
     NODE_ENV: "test" as const,
     ...overrides,
   };

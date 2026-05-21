@@ -91,6 +91,9 @@ beforeAll(async () => {
     LOG_LEVEL: "error",
     WEBHOOK_QUEUE_MAX: 100,
     SHUTDOWN_TIMEOUT: 5000,
+    WEBHOOK_QUEUE_PER_KEY_MAX: 16,
+    CRON_SCHEDULE: "*/10 * * * *",
+    CRON_TZ: "UTC",
     NODE_ENV: "test",
     PRIVATE_KEY: privateKey,
   };
