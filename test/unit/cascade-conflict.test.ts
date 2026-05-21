@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createConflictPR } from "../../src/cascade/conflict.js";
 
-type Response = { status: number; data?: unknown } | { __throw: { status?: number; message?: string } };
+type Response =
+  | { status: number; data?: unknown }
+  | { __throw: { status?: number; message?: string } };
 
 interface MockSpec {
   [route: string]: Response[];
@@ -57,7 +59,12 @@ describe("createConflictPR", () => {
       ],
     });
     const res = await createConflictPR(baseDeps(oc), baseOpts);
-    expect(res).toEqual({ ok: true, pr_url: "https://github.com/o/r/pull/7", pr_number: 7, reused: false });
+    expect(res).toEqual({
+      ok: true,
+      pr_url: "https://github.com/o/r/pull/7",
+      pr_number: 7,
+      reused: false,
+    });
     const createCall = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!;
     const body = createCall.params.body as string;
     expect(body).toContain("@alice");
@@ -79,7 +86,12 @@ describe("createConflictPR", () => {
       ],
     });
     const res = await createConflictPR(baseDeps(oc), baseOpts);
-    expect(res).toEqual({ ok: true, pr_url: "https://github.com/o/r/pull/3", pr_number: 3, reused: true });
+    expect(res).toEqual({
+      ok: true,
+      pr_url: "https://github.com/o/r/pull/3",
+      pr_number: 3,
+      reused: true,
+    });
     expect(oc.calls.some((c) => c.route === "POST /repos/{owner}/{repo}/pulls")).toBe(false);
     const listCall = oc.calls.find((c) => c.route === "GET /repos/{owner}/{repo}/pulls")!;
     expect(listCall.params.head).toBe("o:auto-merge/conflict-main-release-abcdef1");
@@ -95,7 +107,12 @@ describe("createConflictPR", () => {
       ],
     });
     const res = await createConflictPR(baseDeps(oc), baseOpts);
-    expect(res).toEqual({ ok: true, pr_url: "https://github.com/o/r/pull/9", pr_number: 9, reused: false });
+    expect(res).toEqual({
+      ok: true,
+      pr_url: "https://github.com/o/r/pull/9",
+      pr_number: 9,
+      reused: false,
+    });
   });
 
   it("author resolution: username=null → getCommit login → @bob in body", async () => {
@@ -104,16 +121,15 @@ describe("createConflictPR", () => {
       "GET /repos/{owner}/{repo}/commits/{ref}": [
         { status: 200, data: { author: { login: "bob" } } },
       ],
-      "POST /repos/{owner}/{repo}/pulls": [
-        { status: 201, data: { html_url: "u", number: 1 } },
-      ],
+      "POST /repos/{owner}/{repo}/pulls": [{ status: 201, data: { html_url: "u", number: 1 } }],
     });
     const res = await createConflictPR(baseDeps(oc), {
       ...baseOpts,
       headCommitAuthor: { username: null, email: "alice@example.com" },
     });
     expect(res.ok).toBe(true);
-    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params.body as string;
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
     expect(body).toContain("@bob");
   });
 
@@ -121,16 +137,15 @@ describe("createConflictPR", () => {
     const oc = makeOctokit({
       "POST /repos/{owner}/{repo}/git/refs": [{ status: 201, data: {} }],
       "GET /repos/{owner}/{repo}/commits/{ref}": [{ __throw: { status: 500 } }],
-      "POST /repos/{owner}/{repo}/pulls": [
-        { status: 201, data: { html_url: "u", number: 1 } },
-      ],
+      "POST /repos/{owner}/{repo}/pulls": [{ status: 201, data: { html_url: "u", number: 1 } }],
     });
     const res = await createConflictPR(baseDeps(oc), {
       ...baseOpts,
       headCommitAuthor: { username: null, email: "alice@example.com" },
     });
     expect(res.ok).toBe(true);
-    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params.body as string;
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
     expect(body).toContain("(author email: alice@example.com)");
     expect(body).not.toContain("@alice@example.com");
   });
@@ -145,7 +160,8 @@ describe("createConflictPR", () => {
       ...baseOpts,
       headCommitAuthor: { username: null, email: "carol@example.com" },
     });
-    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params.body as string;
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
     expect(body).toContain("(author email: carol@example.com)");
   });
 
@@ -155,7 +171,8 @@ describe("createConflictPR", () => {
       "POST /repos/{owner}/{repo}/pulls": [{ status: 201, data: { html_url: "u", number: 1 } }],
     });
     await createConflictPR(baseDeps(oc), { ...baseOpts, checkRunHtmlUrl: null });
-    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params.body as string;
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
     expect(body).toContain("Check Run: (not available)");
   });
 
@@ -179,7 +196,12 @@ describe("createConflictPR", () => {
       ],
     });
     const res = await createConflictPR(baseDeps(oc), baseOpts);
-    expect(res).toEqual({ ok: true, pr_url: "https://github.com/o/r/pull/5", pr_number: 5, reused: true });
+    expect(res).toEqual({
+      ok: true,
+      pr_url: "https://github.com/o/r/pull/5",
+      pr_number: 5,
+      reused: true,
+    });
   });
 
   it("pulls.create 422 race → pulls.list still empty → {ok:false}", async () => {
