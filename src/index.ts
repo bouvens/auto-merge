@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { attachWebhookErrorRedactor, createProbot, readyzCheck } from "./auth.js";
+import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
 import { loadEnv } from "./env.js";
 import { initLogger, log } from "./log.js";
 import { buildServer } from "./server.js";
@@ -17,6 +17,8 @@ try {
 
   // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
   await probot.ready();
+  // Bot identity must be resolved before any push webhook can fire — loop prevention (D-17) fails closed without it (D-16, CASC-02).
+  await initBotIdentity(env);
   attachWebhookErrorRedactor(probot);
 
   queue = createQueue<{ name: string }>({
