@@ -3,12 +3,13 @@ import type { FastifyInstance } from "fastify";
 import type { Probot } from "probot";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createProbot } from "../../src/auth.js";
-import type { PushJob } from "../../src/cascade/orchestrator.js";
+import type { CascadeJob } from "../../src/cascade/orchestrator.js";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
+import { NoopChannel } from "../../src/notify/channel.js";
 import { buildServer } from "../../src/server.js";
 import { dedup } from "../../src/webhook/dedup.js";
-import { createQueue } from "../../src/webhook/queue.js";
+import { createMultiQueue } from "../../src/webhook/multiQueue.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret-32-chars-long";
 
@@ -50,11 +51,13 @@ beforeAll(async () => {
   await probot.ready();
 
   enqueuedJobs = [];
-  const queue = createQueue<PushJob>({
-    max: 100,
+  const queue = createMultiQueue<CascadeJob>({
+    perKeyMax: 16,
+    globalMax: 100,
     handler: async (job) => {
       enqueuedJobs.push(job.id);
     },
+    notify: new NoopChannel(),
   });
 
   app = await buildServer({ env, log: noopLog, probot, dedup, queue });

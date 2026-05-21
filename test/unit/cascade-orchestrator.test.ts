@@ -26,6 +26,7 @@ const getInstallationOctokitMock = vi.mocked(getInstallationOctokit);
 const job = (overrides: Partial<PushJob> = {}) => ({
   id: "delivery-xyz",
   payload: {
+    source: "push" as const,
     installation_id: 42,
     owner: "acme",
     repo: "widgets",

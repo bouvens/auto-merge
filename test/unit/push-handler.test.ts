@@ -7,12 +7,12 @@ vi.mock("../../src/cascade/sourceShaDedup.js", () => ({
 }));
 
 import { getBotIdentity } from "../../src/auth.js";
-import type { PushJob } from "../../src/cascade/orchestrator.js";
+import type { CascadeJob, PushJob } from "../../src/cascade/orchestrator.js";
 import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
 import { loadConfig } from "../../src/config/loader.js";
 import { log } from "../../src/log.js";
+import type { MultiQueue } from "../../src/webhook/multiQueue.js";
 import { handlePushEvent } from "../../src/webhook/pushHandler.js";
-import type { Queue } from "../../src/webhook/queue.js";
 
 const loadConfigMock = vi.mocked(loadConfig);
 const getBotIdentityMock = vi.mocked(getBotIdentity);
@@ -25,15 +25,18 @@ const config = {
   dev_branch: "dev",
 };
 
-function makeQueue(): Queue<PushJob> & { calls: Array<{ id: string; payload: PushJob }> } {
-  const calls: Array<{ id: string; payload: PushJob }> = [];
+function makeQueue(): MultiQueue<CascadeJob> & {
+  calls: Array<{ key: string; id: string; payload: PushJob }>;
+} {
+  const calls: Array<{ key: string; id: string; payload: PushJob }> = [];
   return {
     calls,
-    enqueue(job) {
-      calls.push({ id: job.id, payload: job.payload });
+    enqueue(key, job) {
+      calls.push({ key, id: job.id, payload: job.payload as PushJob });
     },
     drain: async () => undefined,
     size: () => calls.length,
+    keyCount: () => calls.length,
   };
 }
 

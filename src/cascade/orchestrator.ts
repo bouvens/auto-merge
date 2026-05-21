@@ -14,19 +14,34 @@ export interface PushHeadCommit {
   author: { name?: string; email: string; username?: string | null };
 }
 
-export interface PushJob {
-  installation_id: number;
-  owner: string;
-  repo: string;
-  branch: string;
-  after: string;
-  before: string;
-  sender_login: string;
-  head_commit: PushHeadCommit;
-  config: Config;
-}
+type CascadeJobBase = { installation_id: number; owner: string; repo: string };
 
-export const runCascade: Handler<PushJob> = async (job: Job<PushJob>): Promise<void> => {
+export type CascadeJob =
+  | (CascadeJobBase & {
+      source: "push";
+      branch: string;
+      after: string;
+      before: string;
+      sender_login: string;
+      head_commit: PushHeadCommit;
+      config: Config;
+    })
+  | (CascadeJobBase & { source: "cron"; after: null })
+  | (CascadeJobBase & { source: "dispatch"; after: null; sender?: { login: string } });
+
+// Alias preserves backward compatibility with callers that import PushJob by name.
+export type PushJob = Extract<CascadeJob, { source: "push" }>;
+
+export const runCascade: Handler<CascadeJob> = async (job: Job<CascadeJob>): Promise<void> => {
+  if (job.payload.source !== "push") {
+    // Stub until safetyNet/dispatch handlers land in the next plan; cron/dispatch jobs are no-ops for now.
+    log.info(
+      { event: "cascade_skipped_unwired", source: job.payload.source, delivery_id: job.id },
+      "cascade",
+    );
+    return;
+  }
+
   const { installation_id, owner, repo, branch, after, head_commit, config } = job.payload;
   // runId generated post-ACK so delivery_id and run_id remain distinct across retries.
   const runId = randomUUID();

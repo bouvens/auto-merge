@@ -4,13 +4,14 @@ import type { FastifyInstance } from "fastify";
 import type { Probot } from "probot";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProbot, initBotIdentity } from "../../src/auth.js";
-import type { PushJob } from "../../src/cascade/orchestrator.js";
+import type { CascadeJob, PushJob } from "../../src/cascade/orchestrator.js";
 import { runCascade } from "../../src/cascade/orchestrator.js";
 import type { Env } from "../../src/env.js";
 import { log } from "../../src/log.js";
+import { NoopChannel } from "../../src/notify/channel.js";
 import { buildServer } from "../../src/server.js";
 import { dedup } from "../../src/webhook/dedup.js";
-import { createQueue, type Queue } from "../../src/webhook/queue.js";
+import { createMultiQueue, type MultiQueue } from "../../src/webhook/multiQueue.js";
 import { setupMswGitHub } from "../helpers/msw-github.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret-32-chars-long";
@@ -24,7 +25,7 @@ const harness = setupMswGitHub({
 let privateKey: string;
 let probot: Probot;
 let app: FastifyInstance;
-let queue: Queue<PushJob>;
+let queue: MultiQueue<CascadeJob>;
 let enqueued: Array<{ id: string; payload: PushJob }>;
 let botLogin: string;
 
@@ -105,12 +106,14 @@ beforeAll(async () => {
   botLogin = `${harness.state.appSlug}[bot]`;
 
   enqueued = [];
-  queue = createQueue<PushJob>({
-    max: 100,
+  queue = createMultiQueue<CascadeJob>({
+    perKeyMax: 16,
+    globalMax: 100,
     handler: async (job) => {
-      enqueued.push({ id: job.id, payload: job.payload });
+      enqueued.push({ id: job.id, payload: job.payload as PushJob });
       await runCascade(job);
     },
+    notify: new NoopChannel(),
   });
 
   app = await buildServer({ env, log, probot, dedup, queue });

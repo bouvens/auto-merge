@@ -1,33 +1,43 @@
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
-import { type PushJob, runCascade } from "./cascade/orchestrator.js";
+import { type CascadeJob, runCascade } from "./cascade/orchestrator.js";
 import { loadEnv } from "./env.js";
 import { initLogger } from "./log.js";
+import { NoopChannel } from "./notify/channel.js";
 import { buildServer } from "./server.js";
 import { dedup } from "./webhook/dedup.js";
-import { createQueue } from "./webhook/queue.js";
+import { createMultiQueue } from "./webhook/multiQueue.js";
 
 const env = loadEnv();
 const appLog = initLogger(env);
 
 let app: FastifyInstance | undefined;
-let queue: ReturnType<typeof createQueue<PushJob>> | undefined;
+let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>> | undefined;
 
 try {
   const probot = createProbot(env);
 
   // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
   await probot.ready();
-  // Bot identity must be resolved before any push webhook can fire — loop prevention (D-17) fails closed without it (D-16, CASC-02).
+  // Bot identity must be resolved before any push webhook can fire — loop prevention fails closed without it.
   await initBotIdentity(env);
   attachWebhookErrorRedactor(probot);
 
-  queue = createQueue<PushJob>({
-    max: env.WEBHOOK_QUEUE_MAX,
+  multiQueue = createMultiQueue<CascadeJob>({
+    perKeyMax: env.WEBHOOK_QUEUE_PER_KEY_MAX,
+    globalMax: env.WEBHOOK_QUEUE_MAX,
     handler: runCascade,
+    notify: new NoopChannel(),
   });
 
-  app = await buildServer({ env, log: appLog, readyzFn: readyzCheck, probot, dedup, queue });
+  app = await buildServer({
+    env,
+    log: appLog,
+    readyzFn: readyzCheck,
+    probot,
+    dedup,
+    queue: multiQueue,
+  });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   appLog.info({ port: env.PORT }, "listening");
 } catch (e) {
@@ -45,8 +55,8 @@ const shutdown = async (sig: string) => {
   try {
     // app.close() blocks new HTTP requests before drain so no new jobs enter the queue mid-drain.
     await app?.close();
-    if (queue) {
-      await queue.drain(env.SHUTDOWN_TIMEOUT);
+    if (multiQueue) {
+      await multiQueue.drain(env.SHUTDOWN_TIMEOUT);
     }
     appLog.info("shutdown-clean");
     process.exit(0);
