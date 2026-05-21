@@ -22,7 +22,8 @@ export interface CompleteOpts {
 }
 
 export interface FailureOpts extends CompleteOpts {
-  kind: "real_conflict" | "unknown_error";
+  // permission_error kind distinguishes API-permission failure from real conflicts / unknown errors.
+  kind: "real_conflict" | "unknown_error" | "permission_error" | "protection_blocked";
   detail: string;
 }
 
