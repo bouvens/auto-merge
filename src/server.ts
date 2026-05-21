@@ -5,6 +5,7 @@ import type { Probot } from "probot";
 import type { CascadeJob } from "./cascade/orchestrator.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
+import { registerDispatchHandler } from "./dispatch/handler.js";
 import { registerHandlers } from "./webhook/handler.js";
 import type { MultiQueue } from "./webhook/multiQueue.js";
 import { registerPushHandler } from "./webhook/pushHandler.js";
@@ -57,6 +58,7 @@ export async function buildServer(deps: BuildServerDeps) {
   if (deps.probot && deps.dedup && deps.queue) {
     registerHandlers(deps.probot);
     registerPushHandler(deps.probot, { queue: deps.queue });
+    registerDispatchHandler(deps.probot, { queue: deps.queue });
 
     const { probot, dedup } = deps;
 
