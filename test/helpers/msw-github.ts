@@ -25,6 +25,18 @@ export interface ProtectionResponse {
   lock_branch?: { enabled: boolean };
 }
 
+export interface MockInstallation {
+  id: number;
+  suspended_at?: string | null;
+  account: { login: string };
+}
+
+export interface MockInstallationRepo {
+  name: string;
+  full_name: string;
+  owner: { login: string };
+}
+
 export interface GitHubMockState {
   // branch name → head commit sha
   branches: Record<string, string>;
@@ -48,6 +60,12 @@ export interface GitHubMockState {
   botUserId: number;
   // undefined → 403 (no admin permission), null → 404 (no protection rules), object → 200 (rules present).
   protection: ProtectionResponse | null | undefined;
+  // cron safety-net: list of installations returned by GET /app/installations
+  installations: MockInstallation[];
+  // cron safety-net: repos per installation returned by GET /installation/repositories
+  installationRepos: Record<number, MockInstallationRepo[]>;
+  // identifies which installation token is in use — set by test setup before tick invocation
+  currentInstallationId: number | null;
 }
 
 export interface RecordedRequest {
@@ -80,6 +98,8 @@ export interface MswGitHubHarness {
   checkRunPatchCalls: RecordedRequest[];
   configCalls: RecordedRequest[];
   protectionCalls: RecordedRequest[];
+  installationsCalls: RecordedRequest[];
+  installationReposCalls: RecordedRequest[];
   resetCounters(): void;
 }
 
@@ -106,6 +126,9 @@ function defaultState(overrides: Partial<GitHubMockState>): GitHubMockState {
     appSlug: overrides.appSlug ?? "auto-merge-test",
     botUserId: overrides.botUserId ?? 41898282,
     protection: "protection" in overrides ? overrides.protection : null,
+    installations: overrides.installations ?? [],
+    installationRepos: overrides.installationRepos ?? {},
+    currentInstallationId: overrides.currentInstallationId ?? null,
   };
 }
 
@@ -136,6 +159,8 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
   const checkRunPatchCalls: RecordedRequest[] = [];
   const configCalls: RecordedRequest[] = [];
   const protectionCalls: RecordedRequest[] = [];
+  const installationsCalls: RecordedRequest[] = [];
+  const installationReposCalls: RecordedRequest[] = [];
 
   // Octokit auth-app posts to /app/installations/:id/access_tokens to mint an installation token; respond with a fake bearer + future expiry.
   const handlers = [
@@ -329,6 +354,20 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
     http.get("https://api.github.com/users/:username", ({ params }) =>
       HttpResponse.json({ id: state.botUserId, login: params.username }),
     ),
+
+    http.get("https://api.github.com/app/installations", ({ request }) => {
+      installationsCalls.push({ method: "GET", url: request.url });
+      return HttpResponse.json(
+        state.installations.map((i) => ({ ...i, suspended_at: i.suspended_at ?? null })),
+      );
+    }),
+
+    http.get("https://api.github.com/installation/repositories", ({ request }) => {
+      installationReposCalls.push({ method: "GET", url: request.url });
+      const id = state.currentInstallationId;
+      const repos = id !== null ? (state.installationRepos[id] ?? []) : [];
+      return HttpResponse.json({ total_count: repos.length, repositories: repos });
+    }),
   ];
 
   const server = setupServer(...handlers);
@@ -372,6 +411,8 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
     checkRunPatchCalls,
     configCalls,
     protectionCalls,
+    installationsCalls,
+    installationReposCalls,
     resetCounters() {
       compareCalls.length = 0;
       mergeCalls.length = 0;
@@ -384,6 +425,8 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
       checkRunPatchCalls.length = 0;
       configCalls.length = 0;
       protectionCalls.length = 0;
+      installationsCalls.length = 0;
+      installationReposCalls.length = 0;
       mergeCallSeq = 0;
     },
   };
