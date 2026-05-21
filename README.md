@@ -145,18 +145,35 @@ The following features land in later phases:
 - **Phase 3:** Per-repository lock manager and cron safety-net
 - **Phase 4:** Slack and Telegram conflict notifications
 
-## Triggering Cascade Manually (Preview)
+## Manual Trigger via workflow_dispatch
 
-In a future phase you will be able to trigger a cascade via `workflow_dispatch`. The repository-side workflow (`.github/workflows/cascade.yml`) will look like:
+Use this when webhooks are delayed or you want to force a cascade on the current `main` HEAD without pushing a new commit.
+
+Commit the following workflow to each repository managed by auto-merge:
 
 ```yaml
-# Triggers auto-merge cascade for a specific branch (Phase 3 docs will finalize this)
+# .github/workflows/auto-merge.yml
+name: auto-merge trigger
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "Branch to cascade from"
-        required: true
+permissions:
+  contents: write           # required by POST /repos/{owner}/{repo}/dispatches
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dispatch auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/dispatches \
+            -F event_type=auto-merge
 ```
 
-Full documentation will be added in Phase 3.
+**Notes:**
+
+- No PAT required. The built-in `GITHUB_TOKEN` with `permissions: contents: write` is sufficient to call `POST /repos/{owner}/{repo}/dispatches`.
+- The App always resolves the cascade source from `config.main_branch` HEAD at the time the event is processed. The `client_payload` field is logged for audit but does not influence routing.
+- You may pass additional context via `-F 'client_payload[note]=manual run'`; it appears in structured logs but is otherwise ignored.
+- **GitHub App settings:** ensure `repository_dispatch` is checked under "Subscribe to events" in your App's configuration. Without this subscription the App will not receive the webhook.
+- To avoid a cascade loop, do not wire both `on: push` and the `gh api dispatches` call in the same workflow triggered by a push to `main`. The App itself never calls `POST /dispatches`, so there is no recursion from its side.
