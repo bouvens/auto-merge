@@ -16,6 +16,15 @@ export interface OpenPR {
   base: { ref: string };
 }
 
+export interface ProtectionResponse {
+  required_pull_request_reviews?: object | null;
+  required_status_checks?: { contexts?: string[]; checks?: unknown[] } | null;
+  required_signatures?: { enabled: boolean };
+  required_linear_history?: { enabled: boolean };
+  restrictions?: object | null;
+  lock_branch?: { enabled: boolean };
+}
+
 export interface GitHubMockState {
   // branch name → head commit sha
   branches: Record<string, string>;
@@ -37,6 +46,8 @@ export interface GitHubMockState {
   // bot identity exposed via /app + /users/:slug[bot]
   appSlug: string;
   botUserId: number;
+  // undefined → 403 (no admin permission), null → 404 (no protection rules), object → 200 (rules present).
+  protection: ProtectionResponse | null | undefined;
 }
 
 export interface RecordedRequest {
@@ -56,6 +67,7 @@ export interface MswGitHubHarness {
   setPullsCreateStatus(status: GitHubMockState["pullsCreateStatus"]): void;
   addOpenPR(pr: OpenPR): void;
   setConfigYaml(yaml: string): void;
+  setProtection(value: ProtectionResponse | null | undefined): void;
   // call counters — exposed so integration tests can assert exact request shapes.
   compareCalls: RecordedRequest[];
   mergeCalls: RecordedRequest[];
@@ -67,6 +79,7 @@ export interface MswGitHubHarness {
   checkRunCreateCalls: RecordedRequest[];
   checkRunPatchCalls: RecordedRequest[];
   configCalls: RecordedRequest[];
+  protectionCalls: RecordedRequest[];
   resetCounters(): void;
 }
 
@@ -92,6 +105,7 @@ function defaultState(overrides: Partial<GitHubMockState>): GitHubMockState {
     commitAuthorLogin: overrides.commitAuthorLogin ?? "author-login",
     appSlug: overrides.appSlug ?? "auto-merge-test",
     botUserId: overrides.botUserId ?? 41898282,
+    protection: "protection" in overrides ? overrides.protection : null,
   };
 }
 
@@ -121,6 +135,7 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
   const checkRunCreateCalls: RecordedRequest[] = [];
   const checkRunPatchCalls: RecordedRequest[] = [];
   const configCalls: RecordedRequest[] = [];
+  const protectionCalls: RecordedRequest[] = [];
 
   // Octokit auth-app posts to /app/installations/:id/access_tokens to mint an installation token; respond with a fake bearer + future expiry.
   const handlers = [
@@ -192,6 +207,20 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
           return HttpResponse.json({ message: "Branch not found" }, { status: 404 });
         }
         return HttpResponse.json({ name: branch, commit: { sha } });
+      },
+    ),
+
+    http.get(
+      "https://api.github.com/repos/:owner/:repo/branches/:branch/protection",
+      ({ request }) => {
+        protectionCalls.push({ method: "GET", url: request.url });
+        if (state.protection === undefined) {
+          return HttpResponse.json({ message: "Not Found" }, { status: 403 });
+        }
+        if (state.protection === null) {
+          return HttpResponse.json({ message: "Branch not protected" }, { status: 404 });
+        }
+        return HttpResponse.json(state.protection);
       },
     ),
 
@@ -329,6 +358,9 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
     setConfigYaml(yaml) {
       configYaml = yaml;
     },
+    setProtection(value) {
+      state.protection = value;
+    },
     compareCalls,
     mergeCalls,
     branchCalls,
@@ -339,6 +371,7 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
     checkRunCreateCalls,
     checkRunPatchCalls,
     configCalls,
+    protectionCalls,
     resetCounters() {
       compareCalls.length = 0;
       mergeCalls.length = 0;
@@ -350,6 +383,7 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
       checkRunCreateCalls.length = 0;
       checkRunPatchCalls.length = 0;
       configCalls.length = 0;
+      protectionCalls.length = 0;
       mergeCallSeq = 0;
     },
   };

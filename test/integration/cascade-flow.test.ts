@@ -5,12 +5,14 @@ import { setupMswGitHub } from "../helpers/msw-github.js";
 
 vi.mock("../../src/auth.js", () => ({
   getInstallationOctokit: vi.fn(async () => new Octokit({ baseUrl: "https://api.github.com" })),
+  getBotIdentity: vi.fn(() => ({ id: 41898282, login: "auto-merge-test[bot]" })),
 }));
 
-import type { PushHeadCommit, PushJob } from "../../src/cascade/orchestrator.js";
-import { runCascade } from "../../src/cascade/orchestrator.js";
+import type { CascadeJob, PushHeadCommit, PushJob } from "../../src/cascade/orchestrator.js";
+import { makeRunCascade, runCascade } from "../../src/cascade/orchestrator.js";
 import type { Config } from "../../src/config/schema.js";
 import { log } from "../../src/log.js";
+import { NoopChannel } from "../../src/notify/channel.js";
 import type { Job } from "../../src/webhook/queue.js";
 
 const harness = setupMswGitHub({
@@ -41,6 +43,7 @@ beforeEach(() => {
   harness.state.openPRs = [];
   harness.state.pullsCreateStatus = 201;
   harness.state.branchHeadAfter = undefined;
+  harness.state.protection = null;
   vi.spyOn(log, "info").mockImplementation(() => undefined);
   vi.spyOn(log, "warn").mockImplementation(() => undefined);
   vi.spyOn(log, "error").mockImplementation(() => undefined);
@@ -282,5 +285,72 @@ describe("cascade-flow integration (msw + real Octokit)", () => {
     const body = harness.mergeCalls[0]!.body as { base?: string; head?: string };
     expect(body.base).toBe("dev");
     expect(body.head).toBe("main");
+  });
+
+  it("OPS-04 protection blocks (required_pull_request_reviews) → conflict PR with summaryPrefix, Check Run failure, no merge attempt", async () => {
+    harness.setProtection({ required_pull_request_reviews: { dismiss_stale_reviews: false } });
+
+    await runCascade(makeJob());
+
+    expect(harness.mergeCalls).toHaveLength(0);
+    expect(harness.pullsCreateCalls).toHaveLength(1);
+    const prBody = (harness.pullsCreateCalls[0]!.body as { body?: string }).body ?? "";
+    expect(prBody).toContain("Blocked by branch protection");
+    expect(
+      harness.checkRunPatchCalls.some(
+        (c) => (c.body as { conclusion?: string }).conclusion === "failure",
+      ),
+    ).toBe(true);
+  });
+
+  it("OPS-05 merges:403 → Check Run failure with permission_error, no conflict PR", async () => {
+    harness.setMergeStatus(500);
+    harness.server.use(
+      http.post("https://api.github.com/repos/:owner/:repo/merges", () =>
+        HttpResponse.json({ message: "Forbidden" }, { status: 403 }),
+      ),
+    );
+
+    await runCascade(makeJob());
+
+    expect(harness.pullsCreateCalls).toHaveLength(0);
+    expect(
+      harness.checkRunPatchCalls.some(
+        (c) => (c.body as { conclusion?: string }).conclusion === "failure",
+      ),
+    ).toBe(true);
+    const failPatch = harness.checkRunPatchCalls.find(
+      (c) => (c.body as { conclusion?: string }).conclusion === "failure",
+    );
+    const summary = (failPatch!.body as { output?: { summary?: string } }).output?.summary ?? "";
+    expect(summary).toContain("contents:write");
+  });
+
+  it("OPS-05 branches_protection:403 → permission_error Check Run, no merge attempt", async () => {
+    harness.setProtection(undefined);
+
+    await runCascade(makeJob());
+
+    expect(harness.mergeCalls).toHaveLength(0);
+    expect(harness.pullsCreateCalls).toHaveLength(0);
+    expect(harness.checkRunCreateCalls.length).toBeGreaterThanOrEqual(1);
+    expect(harness.checkRunPatchCalls).toHaveLength(0);
+  });
+
+  it("cron source → resolves main HEAD from branches API, runs cascade, dedup prevents repeat", async () => {
+    const cascade = makeRunCascade({ notify: new NoopChannel() });
+    const cronJob: Job<CascadeJob> = {
+      id: "cron-delivery-1",
+      payload: { source: "cron", installation_id: 42, owner: "acme", repo: "widgets", after: null },
+    };
+
+    await cascade(cronJob);
+
+    expect(harness.mergeCalls.length).toBeGreaterThanOrEqual(1);
+
+    harness.resetCounters();
+    await cascade(cronJob);
+
+    expect(harness.mergeCalls).toHaveLength(0);
   });
 });
