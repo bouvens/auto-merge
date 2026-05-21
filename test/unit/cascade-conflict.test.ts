@@ -213,4 +213,35 @@ describe("createConflictPR", () => {
     const res = await createConflictPR(baseDeps(oc), baseOpts);
     expect(res.ok).toBe(false);
   });
+
+  it("summaryPrefix provided → PR body starts with prefix line before conflict text", async () => {
+    const oc = makeOctokit({
+      "POST /repos/{owner}/{repo}/git/refs": [{ status: 201, data: {} }],
+      "POST /repos/{owner}/{repo}/pulls": [
+        { status: 201, data: { html_url: "https://github.com/o/r/pull/8", number: 8 } },
+      ],
+    });
+    const res = await createConflictPR(baseDeps(oc), {
+      ...baseOpts,
+      summaryPrefix: "Blocked by branch protection: required_pull_request_reviews",
+    });
+    expect(res.ok).toBe(true);
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
+    expect(body.startsWith("Blocked by branch protection: required_pull_request_reviews")).toBe(true);
+    expect(body).toContain("Auto-merge");
+  });
+
+  it("summaryPrefix absent → PR body unchanged (no extra prefix line)", async () => {
+    const oc = makeOctokit({
+      "POST /repos/{owner}/{repo}/git/refs": [{ status: 201, data: {} }],
+      "POST /repos/{owner}/{repo}/pulls": [
+        { status: 201, data: { html_url: "https://github.com/o/r/pull/9", number: 9 } },
+      ],
+    });
+    await createConflictPR(baseDeps(oc), baseOpts);
+    const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
+      .body as string;
+    expect(body.startsWith("Auto-merge")).toBe(true);
+  });
 });

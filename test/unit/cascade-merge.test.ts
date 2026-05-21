@@ -1,8 +1,15 @@
 import type { Octokit } from "@octokit/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as checkRunModule from "../../src/cascade/checkRun.js";
+import * as protectionCheckModule from "../../src/cascade/protectionCheck.js";
 import { mergeStep } from "../../src/cascade/merge.js";
 import { log } from "../../src/log.js";
+
+// Stub protectionCheck so existing tests' request mocks don't need to handle the protection endpoint.
+vi.mock("../../src/cascade/protectionCheck.js", async (importOriginal) => {
+  const original = await importOriginal<typeof protectionCheckModule>();
+  return { ...original, protectionCheck: vi.fn(async () => ({ blocked: false })) };
+});
 
 // Single-page compare fixture — tests override only ahead_by / base_commit.sha.
 function compareData(opts: {
@@ -23,7 +30,12 @@ function compareData(opts: {
   };
 }
 
-const baseDeps = (octokit: Octokit) => ({ octokit, owner: "acme", repo: "widgets" });
+const baseDeps = (octokit: Octokit) => ({
+  octokit,
+  owner: "acme",
+  repo: "widgets",
+  appSlug: "my-app",
+});
 const baseOpts = {
   src: "main",
   tgt: "release",
@@ -313,5 +325,115 @@ describe("mergeStep", () => {
 
     expect(result).toEqual({ outcome: "merged", sha: "ok-sha", check_run_id: null });
     expect(completeSpy).not.toHaveBeenCalled();
+  });
+
+  it("protection_blocked → returns protection_blocked outcome, no merge attempt, no Check Run in_progress", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route.startsWith("GET /repos/{owner}/{repo}/compare/")) {
+        return { data: compareData({ ahead_by: 1 }), status: 200 };
+      }
+      throw new Error(`unexpected route ${route}`);
+    });
+    const octokit = { request } as unknown as Octokit;
+    vi.spyOn(protectionCheckModule, "protectionCheck").mockResolvedValue({
+      blocked: true,
+      rules: ["required_pull_request_reviews"],
+    });
+    const createInProgressSpy = vi.spyOn(checkRunModule, "createInProgress");
+
+    const result = await mergeStep(baseDeps(octokit), baseOpts);
+
+    expect(result).toMatchObject({
+      outcome: "protection_blocked",
+      rule: "required_pull_request_reviews",
+      source_sha: "src1234",
+      check_run_id: null,
+      check_run_html_url: null,
+    });
+    // protection_blocked must skip merge attempt and in_progress Check Run
+    expect(createInProgressSpy).not.toHaveBeenCalled();
+    const mergeCalls = request.mock.calls.filter(([r]) => r === "POST /repos/{owner}/{repo}/merges");
+    expect(mergeCalls).toHaveLength(0);
+  });
+
+  it("protection 403 (permission_error) → createFailureCheckRun called, no merge attempt", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route.startsWith("GET /repos/{owner}/{repo}/compare/")) {
+        return { data: compareData({ ahead_by: 1 }), status: 200 };
+      }
+      throw new Error(`unexpected route ${route}`);
+    });
+    const octokit = { request } as unknown as Octokit;
+    vi.spyOn(protectionCheckModule, "protectionCheck").mockResolvedValue({
+      permission_error: true,
+      status: 403,
+    });
+    const createFailureSpy = vi
+      .spyOn(checkRunModule, "createFailureCheckRun")
+      .mockResolvedValue(undefined);
+    const createInProgressSpy = vi.spyOn(checkRunModule, "createInProgress");
+
+    const result = await mergeStep(baseDeps(octokit), baseOpts);
+
+    expect(result).toMatchObject({
+      outcome: "permission_error",
+      endpoint: "branches_protection",
+      status: 403,
+      missing_permission: "administration:read",
+    });
+    expect(createFailureSpy).toHaveBeenCalledTimes(1);
+    expect(createInProgressSpy).not.toHaveBeenCalled();
+  });
+
+  it("compare 403 → permission_error outcome with endpoint=compare", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route.startsWith("GET /repos/{owner}/{repo}/compare/")) {
+        const err = new Error("forbidden") as Error & { status: number };
+        err.status = 403;
+        throw err;
+      }
+      throw new Error(`unexpected route ${route}`);
+    });
+    const octokit = { request } as unknown as Octokit;
+
+    const result = await mergeStep(baseDeps(octokit), baseOpts);
+
+    expect(result).toMatchObject({
+      outcome: "permission_error",
+      endpoint: "compare",
+      status: 403,
+      missing_permission: "contents:read",
+      check_run_id: null,
+    });
+  });
+
+  it("merges 403 → permission_error outcome with endpoint=merges, check_run_id preserved", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route.startsWith("GET /repos/{owner}/{repo}/compare/")) {
+        return { data: compareData({ ahead_by: 1 }), status: 200 };
+      }
+      if (route === "POST /repos/{owner}/{repo}/merges") {
+        const err = new Error("forbidden") as Error & { status: number };
+        err.status = 403;
+        throw err;
+      }
+      throw new Error(`unexpected route ${route}`);
+    });
+    const octokit = { request } as unknown as Octokit;
+    vi.spyOn(protectionCheckModule, "protectionCheck").mockResolvedValue({ blocked: false });
+    vi.spyOn(checkRunModule, "createInProgress").mockResolvedValue({
+      check_run_id: 55,
+      html_url: "https://gh/cr/55",
+    });
+
+    const result = await mergeStep(baseDeps(octokit), baseOpts);
+
+    expect(result).toMatchObject({
+      outcome: "permission_error",
+      endpoint: "merges",
+      status: 403,
+      missing_permission: "contents:write",
+      check_run_id: 55,
+    });
   });
 });

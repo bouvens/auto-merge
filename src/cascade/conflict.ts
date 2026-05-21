@@ -14,6 +14,8 @@ export interface ConflictPROpts {
   runId: string;
   checkRunHtmlUrl: string | null;
   headCommitAuthor: { username?: string | null; email: string };
+  // summaryPrefix surfaces branch-protection rule name on PR body's first line; falls back to plain conflict text when omitted.
+  summaryPrefix?: string;
 }
 
 export type ConflictPRResult =
@@ -76,11 +78,15 @@ async function resolveAuthor(deps: ConflictPRDeps, opts: ConflictPROpts): Promis
 
 function composeBody(opts: ConflictPROpts, mention: string): string {
   const checkRunLine = opts.checkRunHtmlUrl ?? "(not available)";
-  return [
+  const lines = [
     `Auto-merge \`${opts.src}\` → \`${opts.tgt}\` failed on commit \`${shortSha(opts.source_sha)}\` (cc ${mention}).`,
     `run_id: ${opts.runId}`,
     `Check Run: ${checkRunLine}`,
-  ].join("\n");
+  ];
+  if (opts.summaryPrefix) {
+    lines.unshift(opts.summaryPrefix);
+  }
+  return lines.join("\n");
 }
 
 export async function createConflictPR(

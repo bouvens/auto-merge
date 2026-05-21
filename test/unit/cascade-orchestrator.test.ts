@@ -4,24 +4,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/cascade/plan.js", () => ({ buildCascadePlan: vi.fn() }));
 vi.mock("../../src/cascade/merge.js", () => ({ mergeStep: vi.fn() }));
 vi.mock("../../src/cascade/conflict.js", () => ({ createConflictPR: vi.fn() }));
-vi.mock("../../src/cascade/checkRun.js", () => ({ completeFailure: vi.fn() }));
+vi.mock("../../src/cascade/checkRun.js", () => ({ completeFailure: vi.fn(), createInProgress: vi.fn() }));
 vi.mock("../../src/auth.js", () => ({
   getInstallationOctokit: vi.fn(async () => ({ request: vi.fn() })),
+  getBotIdentity: vi.fn(() => ({ login: "my-app[bot]", email: "bot@noreply" })),
 }));
+vi.mock("../../src/config/loader.js", () => ({ loadConfig: vi.fn() }));
 
-import { getInstallationOctokit } from "../../src/auth.js";
-import { completeFailure } from "../../src/cascade/checkRun.js";
+import { getInstallationOctokit, getBotIdentity } from "../../src/auth.js";
+import { completeFailure, createInProgress } from "../../src/cascade/checkRun.js";
 import { createConflictPR } from "../../src/cascade/conflict.js";
 import { mergeStep } from "../../src/cascade/merge.js";
-import { type PushJob, runCascade } from "../../src/cascade/orchestrator.js";
+import { type CascadeJob, type PushJob, makeRunCascade } from "../../src/cascade/orchestrator.js";
 import { buildCascadePlan } from "../../src/cascade/plan.js";
+import { loadConfig } from "../../src/config/loader.js";
 import { log } from "../../src/log.js";
+import type { NotificationChannel, NotifyEvent } from "../../src/notify/channel.js";
 
 const mergeStepMock = vi.mocked(mergeStep);
 const buildCascadePlanMock = vi.mocked(buildCascadePlan);
 const createConflictPRMock = vi.mocked(createConflictPR);
 const completeFailureMock = vi.mocked(completeFailure);
 const getInstallationOctokitMock = vi.mocked(getInstallationOctokit);
+const loadConfigMock = vi.mocked(loadConfig);
+
+const notifyEvents: NotifyEvent[] = [];
+const mockNotify: NotificationChannel = {
+  notify: vi.fn(async (e: NotifyEvent) => {
+    notifyEvents.push(e);
+  }),
+};
+
+function makeRunCascadeWithNoop() {
+  return makeRunCascade({ notify: mockNotify });
+}
 
 const job = (overrides: Partial<PushJob> = {}) => ({
   id: "delivery-xyz",
@@ -48,17 +64,31 @@ const job = (overrides: Partial<PushJob> = {}) => ({
   } as PushJob,
 });
 
+const cronJob = (overrides: Partial<Extract<CascadeJob, { source: "cron" }>> = {}) => ({
+  id: "cron-job-1",
+  payload: {
+    source: "cron" as const,
+    installation_id: 42,
+    owner: "acme",
+    repo: "widgets",
+    after: null,
+    ...overrides,
+  } as Extract<CascadeJob, { source: "cron" }>,
+});
+
 let infoSpy: ReturnType<typeof vi.spyOn>;
 let errorSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  notifyEvents.length = 0;
   getInstallationOctokitMock.mockResolvedValue({ request: vi.fn() } as never);
+  vi.mocked(getBotIdentity).mockReturnValue({ login: "my-app[bot]", email: "bot@noreply" });
   infoSpy = vi.spyOn(log, "info").mockImplementation(() => undefined);
   errorSpy = vi.spyOn(log, "error").mockImplementation(() => undefined);
 });
 
-describe("runCascade", () => {
+describe("runCascade (via makeRunCascade)", () => {
   it("two-pair plan, both merged → both pairs visited, no completeFailure, no createConflictPR", async () => {
     buildCascadePlanMock.mockResolvedValue([
       { src: "main", tgt: "release" },
@@ -66,7 +96,7 @@ describe("runCascade", () => {
     ]);
     mergeStepMock.mockResolvedValue({ outcome: "merged", sha: "abc", check_run_id: 1 });
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     expect(mergeStepMock).toHaveBeenCalledTimes(2);
     expect(completeFailureMock).not.toHaveBeenCalled();
@@ -91,7 +121,7 @@ describe("runCascade", () => {
       reused: false,
     });
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     expect(mergeStepMock).toHaveBeenCalledTimes(1);
     expect(createConflictPRMock).toHaveBeenCalledTimes(1);
@@ -111,7 +141,7 @@ describe("runCascade", () => {
       check_run_id: 11,
     });
 
-    await runCascade(job({ branch: "main" }));
+    await makeRunCascadeWithNoop()(job({ branch: "main" }));
 
     expect(createConflictPRMock).not.toHaveBeenCalled();
     expect(completeFailureMock).toHaveBeenCalledTimes(1);
@@ -131,7 +161,7 @@ describe("runCascade", () => {
     });
     createConflictPRMock.mockResolvedValue({ ok: false, error: "createRef 500" });
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     expect(completeFailureMock).toHaveBeenCalledTimes(1);
     const failArg = completeFailureMock.mock.calls[0]![1];
@@ -143,7 +173,7 @@ describe("runCascade", () => {
   it("buildCascadePlan throws → cascade_failed logged, mergeStep NOT called", async () => {
     buildCascadePlanMock.mockRejectedValue(new Error("getBranch 503"));
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     expect(mergeStepMock).not.toHaveBeenCalled();
     expect(completeFailureMock).not.toHaveBeenCalled();
@@ -159,7 +189,7 @@ describe("runCascade", () => {
       throw new Error("network drop");
     });
 
-    await expect(runCascade(job())).resolves.toBeUndefined();
+    await expect(makeRunCascadeWithNoop()(job())).resolves.toBeUndefined();
     const errorEvents = errorSpy.mock.calls
       .map((c: unknown[]) => (c[0] as { event?: string })?.event)
       .filter(Boolean);
@@ -175,7 +205,7 @@ describe("runCascade", () => {
       .mockResolvedValueOnce({ outcome: "skipped", reason: "ahead_by_zero" })
       .mockResolvedValueOnce({ outcome: "merged", sha: "xyz", check_run_id: 2 });
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     expect(mergeStepMock).toHaveBeenCalledTimes(2);
     expect(completeFailureMock).not.toHaveBeenCalled();
@@ -184,7 +214,7 @@ describe("runCascade", () => {
   it("runId is a valid UUID v4 string in cascade_started log", async () => {
     buildCascadePlanMock.mockResolvedValue([]);
 
-    await runCascade(job());
+    await makeRunCascadeWithNoop()(job());
 
     const started = infoSpy.mock.calls.find(
       (c: unknown[]) => (c[0] as { event?: string })?.event === "cascade_started",
@@ -192,5 +222,133 @@ describe("runCascade", () => {
     expect(started).toBeDefined();
     const runId = (started![0] as { run_id: string }).run_id;
     expect(runId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  });
+
+  it("protection_blocked → createConflictPR with summaryPrefix, completeFailure with protection_blocked kind, notify called, break", async () => {
+    buildCascadePlanMock.mockResolvedValue([
+      { src: "main", tgt: "release" },
+      { src: "release", tgt: "dev" },
+    ]);
+    mergeStepMock.mockResolvedValueOnce({
+      outcome: "protection_blocked",
+      rule: "required_pull_request_reviews",
+      source_sha: "src1234",
+      check_run_id: null,
+      check_run_html_url: null,
+    });
+    createConflictPRMock.mockResolvedValue({
+      ok: true,
+      pr_url: "https://gh/pr/11",
+      pr_number: 11,
+      reused: false,
+    });
+    vi.mocked(createInProgress).mockResolvedValue({ check_run_id: 99, html_url: "https://gh/cr/99" });
+
+    await makeRunCascadeWithNoop()(job());
+
+    expect(mergeStepMock).toHaveBeenCalledTimes(1);
+    expect(createConflictPRMock).toHaveBeenCalledTimes(1);
+    const prArg = createConflictPRMock.mock.calls[0]![1];
+    expect((prArg as { summaryPrefix?: string }).summaryPrefix).toBe(
+      "Blocked by branch protection: required_pull_request_reviews",
+    );
+    expect(completeFailureMock).toHaveBeenCalledTimes(1);
+    const failArg = completeFailureMock.mock.calls[0]![1];
+    expect(failArg.kind).toBe("protection_blocked");
+    const notifyCall = notifyEvents.find((e) => e.kind === "protection_blocked");
+    expect(notifyCall).toBeDefined();
+    if (notifyCall?.kind === "protection_blocked") {
+      expect(notifyCall.rule).toBe("required_pull_request_reviews");
+    }
+  });
+
+  it("permission_error → NO createConflictPR, completeFailure called, notify called, break", async () => {
+    buildCascadePlanMock.mockResolvedValue([
+      { src: "main", tgt: "release" },
+      { src: "release", tgt: "dev" },
+    ]);
+    mergeStepMock.mockResolvedValueOnce({
+      outcome: "permission_error",
+      endpoint: "merges",
+      status: 403,
+      missing_permission: "contents:write",
+      check_run_id: 55,
+    });
+
+    await makeRunCascadeWithNoop()(job());
+
+    expect(mergeStepMock).toHaveBeenCalledTimes(1);
+    expect(createConflictPRMock).not.toHaveBeenCalled();
+    expect(completeFailureMock).toHaveBeenCalledTimes(1);
+    const failArg = completeFailureMock.mock.calls[0]![1];
+    expect(failArg.kind).toBe("permission_error");
+    const notifyCall = notifyEvents.find((e) => e.kind === "permission_error");
+    expect(notifyCall).toBeDefined();
+    if (notifyCall?.kind === "permission_error") {
+      expect(notifyCall.endpoint).toBe("merges");
+      expect(notifyCall.missing_permission).toBe("contents:write");
+    }
+  });
+
+  it("cron source → loadConfig called, octokit.request GET /branches used to resolve SHA, mergeStep called", async () => {
+    const fakeOctokit = {
+      request: vi.fn(async (route: string) => {
+        if (route === "GET /repos/{owner}/{repo}/branches/{branch}") {
+          return { data: { commit: { sha: "cron-resolved-sha" } } };
+        }
+        throw new Error(`unexpected: ${route}`);
+      }),
+    };
+    getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+    loadConfigMock.mockResolvedValue({
+      config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+      errors: [],
+    });
+    buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+    mergeStepMock.mockResolvedValue({ outcome: "merged", sha: "xxx", check_run_id: null });
+
+    await makeRunCascadeWithNoop()(cronJob());
+
+    expect(loadConfigMock).toHaveBeenCalledTimes(1);
+    expect(mergeStepMock).toHaveBeenCalledTimes(1);
+    const deps = mergeStepMock.mock.calls[0]![0];
+    expect((deps as { source_sha?: string }).source_sha ?? (mergeStepMock.mock.calls[0]![1] as { source_sha: string }).source_sha).toBe("cron-resolved-sha");
+  });
+
+  it("dispatch source → cascade_started log includes sender_login from job payload", async () => {
+    const fakeOctokit = {
+      request: vi.fn(async (route: string) => {
+        if (route === "GET /repos/{owner}/{repo}/branches/{branch}") {
+          return { data: { commit: { sha: "dispatch-sha" } } };
+        }
+        throw new Error(`unexpected: ${route}`);
+      }),
+    };
+    getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+    loadConfigMock.mockResolvedValue({
+      config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+      errors: [],
+    });
+    buildCascadePlanMock.mockResolvedValue([]);
+
+    const dispatchJob = {
+      id: "dispatch-1",
+      payload: {
+        source: "dispatch" as const,
+        installation_id: 42,
+        owner: "acme",
+        repo: "widgets",
+        after: null,
+        sender: { login: "deploy-bot" },
+      },
+    };
+
+    await makeRunCascadeWithNoop()(dispatchJob);
+
+    const started = infoSpy.mock.calls.find(
+      (c: unknown[]) => (c[0] as { event?: string })?.event === "cascade_started",
+    );
+    expect(started).toBeDefined();
+    expect((started![0] as { sender_login?: string }).sender_login).toBe("deploy-bot");
   });
 });
