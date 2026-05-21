@@ -52,21 +52,26 @@ try {
 // Guards against double-shutdown when the container runtime delivers SIGTERM twice.
 let shuttingDown = false;
 
-const shutdown = async (sig: string) => {
-  if (shuttingDown) return;
+export const shutdown = async (sig: string) => {
+  if (shuttingDown) {
+    // Idempotency: log and bail so cronHandle.stop / drain are not called twice.
+    appLog.warn({ sig, event: "shutdown_already_in_progress" }, "shutdown");
+    return;
+  }
   shuttingDown = true;
-  appLog.info({ sig }, "shutdown-start");
+  appLog.info({ sig, event: "shutdown_start" }, "shutdown");
   try {
-    // app.close() blocks new HTTP requests before drain so no new jobs enter the queue mid-drain.
+    // D-18: stop cron first so no new jobs enter the queue while we drain.
+    if (cronHandle) await cronHandle.stop();
+    // Close Fastify so no new webhook jobs are accepted before drain.
     await app?.close();
-    if (multiQueue) {
-      await multiQueue.drain(env.SHUTDOWN_TIMEOUT);
-    }
-    appLog.info("shutdown-clean");
+    // Drain outstanding cascade jobs; timeout exits 0 per D-19 (not an error).
+    if (multiQueue) await multiQueue.drain(env.SHUTDOWN_TIMEOUT);
+    appLog.info({ event: "shutdown_clean" }, "shutdown");
     process.exit(0);
   } catch (e) {
     // Exit 1 so k8s restarts the pod rather than leaving a non-processing zombie.
-    appLog.error({ err: e }, "shutdown-error");
+    appLog.error({ err: e, event: "shutdown_error" }, "shutdown");
     process.exit(1);
   }
 };
