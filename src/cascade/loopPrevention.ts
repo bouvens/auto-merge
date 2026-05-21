@@ -17,8 +17,7 @@ type Predicate = (p: LoopCheckPayload, bot: BotIdentity) => boolean;
 const CRITERIA: Record<"sender" | "author_email" | "trailer", Predicate> = {
   sender: (p, bot) => p.sender.login === bot.login,
   author_email: (p, bot) =>
-    p.head_commit !== null &&
-    p.head_commit.author.email.toLowerCase() === bot.email.toLowerCase(),
+    p.head_commit !== null && p.head_commit.author.email.toLowerCase() === bot.email.toLowerCase(),
   // Multiline regex: `Auto-Merge:` anywhere on its own line, case-sensitive per D-17.
   trailer: (p) => p.head_commit !== null && /^Auto-Merge:/m.test(p.head_commit.message),
 } as const;

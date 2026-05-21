@@ -29,12 +29,12 @@ function composeBody(compare: CompareData): string {
   if (compare.commits.length === 0) {
     throw new Error("buildCommitMessage: empty commits[] with total_commits>0");
   }
+  // Guards above ensure commits[] is non-empty; indexed access is safe but use locals to satisfy noUncheckedIndexedAccess if enabled.
+  const first = compare.commits[0] as CompareData["commits"][number];
+  const last = compare.commits[compare.commits.length - 1] as CompareData["commits"][number];
   if (compare.total_commits === 1) {
-    const c = compare.commits[0]!;
-    return `1 commit ${shortSha(c.sha)} (${truncateSubject(c.commit.message)})`;
+    return `1 commit ${shortSha(first.sha)} (${truncateSubject(first.commit.message)})`;
   }
-  const first = compare.commits[0]!;
-  const last = compare.commits[compare.commits.length - 1]!;
   return `${compare.total_commits} commits from ${shortSha(first.sha)} (${truncateSubject(
     first.commit.message,
   )}) to ${shortSha(last.sha)} (${truncateSubject(last.commit.message)})`;

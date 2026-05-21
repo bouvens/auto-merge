@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildCommitMessage,
-  type CompareData,
-} from "../../src/cascade/commitMessage.js";
+import { buildCommitMessage, type CompareData } from "../../src/cascade/commitMessage.js";
 
 describe("buildCommitMessage", () => {
   it("N=1 happy path produces exact title/body/trailer", () => {
     const compare: CompareData = {
       total_commits: 1,
-      commits: [
-        { sha: "abcdef1234567", commit: { message: "feat: add login" } },
-      ],
+      commits: [{ sha: "abcdef1234567", commit: { message: "feat: add login" } }],
     };
     const out = buildCommitMessage({
       src: "main",
@@ -84,16 +79,16 @@ describe("buildCommitMessage", () => {
 
   it("total_commits=0 throws", () => {
     const compare: CompareData = { total_commits: 0, commits: [] };
-    expect(() =>
-      buildCommitMessage({ src: "main", tgt: "dev", runId: "r", compare }),
-    ).toThrow(/total_commits=0/);
+    expect(() => buildCommitMessage({ src: "main", tgt: "dev", runId: "r", compare })).toThrow(
+      /total_commits=0/,
+    );
   });
 
   it("empty commits[] with total_commits>0 throws", () => {
     const compare: CompareData = { total_commits: 2, commits: [] };
-    expect(() =>
-      buildCommitMessage({ src: "main", tgt: "dev", runId: "r", compare }),
-    ).toThrow(/empty commits\[\]/);
+    expect(() => buildCommitMessage({ src: "main", tgt: "dev", runId: "r", compare })).toThrow(
+      /empty commits\[\]/,
+    );
   });
 
   it("trailer is always last with one preceding blank line", () => {

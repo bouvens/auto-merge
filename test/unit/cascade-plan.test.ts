@@ -16,11 +16,7 @@ describe("buildCascadePlan", () => {
   it("main push, no release in config → [main→dev], no octokit calls", async () => {
     const request = vi.fn();
     const octokit = { request } as unknown as Octokit;
-    const out = await buildCascadePlan(
-      { octokit, owner: "o", repo: "r" },
-      baseConfig,
-      "main",
-    );
+    const out = await buildCascadePlan({ octokit, owner: "o", repo: "r" }, baseConfig, "main");
     expect(out).toEqual([{ src: "main", tgt: "dev" }]);
     expect(request).not.toHaveBeenCalled();
   });
