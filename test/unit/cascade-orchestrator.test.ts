@@ -12,10 +12,10 @@ vi.mock("../../src/auth.js", () => ({
 import { getInstallationOctokit } from "../../src/auth.js";
 import { completeFailure } from "../../src/cascade/checkRun.js";
 import { createConflictPR } from "../../src/cascade/conflict.js";
-import { log } from "../../src/log.js";
 import { mergeStep } from "../../src/cascade/merge.js";
-import { runCascade, type PushJob } from "../../src/cascade/orchestrator.js";
+import { type PushJob, runCascade } from "../../src/cascade/orchestrator.js";
 import { buildCascadePlan } from "../../src/cascade/plan.js";
+import { log } from "../../src/log.js";
 
 const mergeStepMock = vi.mocked(mergeStep);
 const buildCascadePlanMock = vi.mocked(buildCascadePlan);
@@ -190,8 +190,6 @@ describe("runCascade", () => {
     );
     expect(started).toBeDefined();
     const runId = (started![0] as { run_id: string }).run_id;
-    expect(runId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    );
+    expect(runId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 });

@@ -1,7 +1,7 @@
 import type { Probot } from "probot";
 import { getBotIdentity } from "../auth.js";
-import type { PushJob } from "../cascade/orchestrator.js";
 import { checkLoop } from "../cascade/loopPrevention.js";
+import type { PushJob } from "../cascade/orchestrator.js";
 import { sourceShaDedup } from "../cascade/sourceShaDedup.js";
 import { loadConfig } from "../config/loader.js";
 import { log } from "../log.js";

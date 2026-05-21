@@ -7,8 +7,8 @@ vi.mock("../../src/cascade/sourceShaDedup.js", () => ({
 }));
 
 import { getBotIdentity } from "../../src/auth.js";
-import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
 import type { PushJob } from "../../src/cascade/orchestrator.js";
+import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
 import { loadConfig } from "../../src/config/loader.js";
 import { log } from "../../src/log.js";
 import { handlePushEvent } from "../../src/webhook/pushHandler.js";
@@ -143,9 +143,7 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
     const infoSpy = vi.spyOn(log, "info");
     await handlePushEvent(makeCtx({ sender: { login: "my-app[bot]" } }), { queue: q });
     expect(q.calls).toHaveLength(0);
-    const events = infoSpy.mock.calls.map(
-      (c: unknown[]) => (c[0] as { event?: string })?.event,
-    );
+    const events = infoSpy.mock.calls.map((c: unknown[]) => (c[0] as { event?: string })?.event);
     expect(events).toContain("cascade_skipped_loop_prevention");
   });
 
@@ -155,9 +153,7 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
     const infoSpy = vi.spyOn(log, "info");
     await handlePushEvent(makeCtx({}), { queue: q });
     expect(q.calls).toHaveLength(0);
-    const events = infoSpy.mock.calls.map(
-      (c: unknown[]) => (c[0] as { event?: string })?.event,
-    );
+    const events = infoSpy.mock.calls.map((c: unknown[]) => (c[0] as { event?: string })?.event);
     expect(events).toContain("cascade_skipped_dedup");
   });
 
@@ -187,10 +183,7 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
 
   it("happy path: push to release_branch → enqueued with branch=release", async () => {
     const q = makeQueue();
-    await handlePushEvent(
-      makeCtx({ ref: "refs/heads/release" }, "deliv-release"),
-      { queue: q },
-    );
+    await handlePushEvent(makeCtx({ ref: "refs/heads/release" }, "deliv-release"), { queue: q });
     expect(q.calls).toHaveLength(1);
     expect(q.calls[0]!.payload.branch).toBe("release");
   });

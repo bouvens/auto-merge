@@ -5,7 +5,7 @@ import { log } from "../log.js";
 import type { Handler, Job } from "../webhook/queue.js";
 import { completeFailure } from "./checkRun.js";
 import { createConflictPR } from "./conflict.js";
-import { mergeStep, type MergeOutcome } from "./merge.js";
+import { type MergeOutcome, mergeStep } from "./merge.js";
 import { buildCascadePlan } from "./plan.js";
 
 export interface PushHeadCommit {
