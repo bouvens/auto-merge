@@ -2,7 +2,7 @@ import { log } from "../log.js";
 import type { NotificationChannel } from "../notify/channel.js";
 import type { Handler, Job } from "./queue.js";
 
-export type { Job, Handler };
+export type { Handler, Job };
 
 export interface MultiQueue<T> {
   enqueue(key: string, job: Job<T>): void;
@@ -64,13 +64,18 @@ export function createMultiQueue<T>(opts: MultiQueueOpts<T>): MultiQueue<T> {
   const dropOverflow = (targetKey: string, targetLane: Lane<T>, queueMax: number): void => {
     const dropped = targetLane.buf.shift() as Job<T>;
     log.warn(
-      { event: "multi_queue_overflow", key: targetKey, dropped_id: dropped.id, queue_max: queueMax },
+      {
+        event: "multi_queue_overflow",
+        key: targetKey,
+        dropped_id: dropped.id,
+        queue_max: queueMax,
+      },
       "drop-oldest",
     );
     // Fire-and-forget; catch prevents a rejecting notify from crashing the synchronous enqueue path.
-    opts.notify.notify({ kind: "queue_overflow", key: targetKey, dropped_id: dropped.id }).catch(
-      (err: unknown) => log.error({ err, event: "notify_failed" }, "notify"),
-    );
+    opts.notify
+      .notify({ kind: "queue_overflow", key: targetKey, dropped_id: dropped.id })
+      .catch((err: unknown) => log.error({ err, event: "notify_failed" }, "notify"));
   };
 
   return {
