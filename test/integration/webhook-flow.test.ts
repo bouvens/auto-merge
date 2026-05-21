@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import type { Probot } from "probot";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createProbot } from "../../src/auth.js";
+import type { PushJob } from "../../src/cascade/orchestrator.js";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
@@ -46,7 +47,7 @@ beforeAll(async () => {
   await probot.ready();
 
   enqueuedJobs = [];
-  const queue = createQueue<{ name: string }>({
+  const queue = createQueue<PushJob>({
     max: 100,
     handler: async (job) => {
       enqueuedJobs.push(job.id);
@@ -145,12 +146,15 @@ describe("POST /webhook", () => {
     expect(enqueuedJobs).toHaveLength(0);
   });
 
-  it("returns 202 and enqueues cascade-placeholder for push event", async () => {
+  it("returns 202 for push event without head_commit (D-02 filter) without enqueueing", async () => {
     const body = JSON.stringify({
       ref: "refs/heads/main",
-      repository: { full_name: "org/repo" },
+      repository: { full_name: "org/repo", name: "repo", owner: { login: "org" } },
       installation: { id: 42 },
       sender: { login: "user" },
+      head_commit: null,
+      created: false,
+      deleted: false,
     });
     const sig = signBody(body);
     const deliveryId = `push-delivery-${Date.now()}`;
@@ -169,10 +173,10 @@ describe("POST /webhook", () => {
 
     expect(response.statusCode).toBe(202);
 
-    // Wait for deferred queue worker to process
     await new Promise((r) => setTimeout(r, 20));
 
-    expect(enqueuedJobs).toContain(deliveryId);
+    // head_commit:null is filtered (D-02) — push handler returns early, no enqueue.
+    expect(enqueuedJobs).not.toContain(deliveryId);
   });
 
   it("does not log payload in lifecycle handlers", async () => {

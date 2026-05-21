@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
+import { type PushJob, runCascade } from "./cascade/orchestrator.js";
 import { loadEnv } from "./env.js";
-import { initLogger, log } from "./log.js";
+import { initLogger } from "./log.js";
 import { buildServer } from "./server.js";
 import { dedup } from "./webhook/dedup.js";
 import { createQueue } from "./webhook/queue.js";
@@ -10,7 +11,7 @@ const env = loadEnv();
 const appLog = initLogger(env);
 
 let app: FastifyInstance | undefined;
-let queue: ReturnType<typeof createQueue<{ name: string }>> | undefined;
+let queue: ReturnType<typeof createQueue<PushJob>> | undefined;
 
 try {
   const probot = createProbot(env);
@@ -21,11 +22,9 @@ try {
   await initBotIdentity(env);
   attachWebhookErrorRedactor(probot);
 
-  queue = createQueue<{ name: string }>({
+  queue = createQueue<PushJob>({
     max: env.WEBHOOK_QUEUE_MAX,
-    handler: async (job) => {
-      log.info({ delivery_id: job.id, name: job.payload.name }, "cascade-placeholder");
-    },
+    handler: runCascade,
   });
 
   app = await buildServer({ env, log: appLog, readyzFn: readyzCheck, probot, dedup, queue });
