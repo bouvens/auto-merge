@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/core";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupMswGitHub } from "../helpers/msw-github.js";
 
@@ -7,9 +7,9 @@ vi.mock("../../src/auth.js", () => ({
   getInstallationOctokit: vi.fn(async () => new Octokit({ baseUrl: "https://api.github.com" })),
 }));
 
-import type { Config } from "../../src/config/schema.js";
 import type { PushHeadCommit, PushJob } from "../../src/cascade/orchestrator.js";
 import { runCascade } from "../../src/cascade/orchestrator.js";
+import type { Config } from "../../src/config/schema.js";
 import { log } from "../../src/log.js";
 import type { Job } from "../../src/webhook/queue.js";
 
@@ -123,7 +123,9 @@ describe("cascade-flow integration (msw + real Octokit)", () => {
     harness.state.compare = {
       ahead_by: 1,
       total_commits: 1,
-      commits: [{ sha: "abc123def4567890abcdef1234567890abcdef12", commit: { message: "feat: thing" } }],
+      commits: [
+        { sha: "abc123def4567890abcdef1234567890abcdef12", commit: { message: "feat: thing" } },
+      ],
       base_commit: { sha: "tgt-head" },
     };
 
@@ -144,7 +146,11 @@ describe("cascade-flow integration (msw + real Octokit)", () => {
     harness.server.use(
       http.post("https://api.github.com/repos/:owner/:repo/merges", async ({ request }) => {
         mergeSeq += 1;
-        harness.mergeCalls.push({ method: "POST", url: request.url, body: await request.clone().json() });
+        harness.mergeCalls.push({
+          method: "POST",
+          url: request.url,
+          body: await request.clone().json(),
+        });
         if (mergeSeq === 1) {
           return HttpResponse.json({ message: "Merge conflict" }, { status: 409 });
         }

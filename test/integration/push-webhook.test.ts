@@ -1,8 +1,8 @@
 import { createHmac, generateKeyPairSync } from "node:crypto";
+import { Octokit } from "@octokit/core";
 import type { FastifyInstance } from "fastify";
 import type { Probot } from "probot";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { Octokit } from "@octokit/core";
 import { createProbot, initBotIdentity } from "../../src/auth.js";
 import type { PushJob } from "../../src/cascade/orchestrator.js";
 import { runCascade } from "../../src/cascade/orchestrator.js";

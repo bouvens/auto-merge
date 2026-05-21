@@ -1,6 +1,6 @@
 // Shared msw GitHub harness — keeps integration tests focused on behavior, not on setting up identical handlers in each file.
-import { http, HttpResponse } from "msw";
-import { setupServer, type SetupServer } from "msw/node";
+import { HttpResponse, http } from "msw";
+import { type SetupServer, setupServer } from "msw/node";
 
 export interface CompareData {
   ahead_by: number;
@@ -73,7 +73,9 @@ export interface MswGitHubHarness {
 const DEFAULT_COMPARE: CompareData = {
   ahead_by: 1,
   total_commits: 1,
-  commits: [{ sha: "aaaaaaa1111111111111111111111111111111aa", commit: { message: "feat: change" } }],
+  commits: [
+    { sha: "aaaaaaa1111111111111111111111111111111aa", commit: { message: "feat: change" } },
+  ],
   base_commit: { sha: "tgt-head-before" },
 };
 
@@ -122,64 +124,56 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
 
   // Octokit auth-app posts to /app/installations/:id/access_tokens to mint an installation token; respond with a fake bearer + future expiry.
   const handlers = [
-    http.post(
-      "https://api.github.com/app/installations/:installation_id/access_tokens",
-      () =>
-        HttpResponse.json(
+    http.post("https://api.github.com/app/installations/:installation_id/access_tokens", () =>
+      HttpResponse.json(
+        {
+          token: "ghs_test_installation_token",
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          permissions: { contents: "write", pull_requests: "write", checks: "write" },
+          repository_selection: "all",
+        },
+        { status: 201 },
+      ),
+    ),
+
+    http.get("https://api.github.com/repos/:owner/:repo/contents/:path", ({ request }) => {
+      configCalls.push({ method: "GET", url: request.url });
+      return HttpResponse.json({
+        name: "auto-merge.yml",
+        path: ".github/auto-merge.yml",
+        type: "file",
+        encoding: "base64",
+        content: base64(configYaml),
+      });
+    }),
+
+    http.get("https://api.github.com/repos/:owner/:repo/compare/:basehead", ({ request }) => {
+      compareCalls.push({ method: "GET", url: request.url });
+      return HttpResponse.json(state.compare);
+    }),
+
+    http.post("https://api.github.com/repos/:owner/:repo/merges", async ({ request }) => {
+      const body = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      mergeCalls.push({ method: "POST", url: request.url, body });
+      mergeCallSeq += 1;
+      const status = state.mergeStatus;
+      if (status === 201) {
+        return HttpResponse.json(
           {
-            token: "ghs_test_installation_token",
-            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-            permissions: { contents: "write", pull_requests: "write", checks: "write" },
-            repository_selection: "all",
+            sha: state.mergeSha,
+            commit: { message: (body as { commit_message?: string } | undefined)?.commit_message },
           },
           { status: 201 },
-        ),
-    ),
-
-    http.get(
-      "https://api.github.com/repos/:owner/:repo/contents/:path",
-      ({ request }) => {
-        configCalls.push({ method: "GET", url: request.url });
-        return HttpResponse.json({
-          name: "auto-merge.yml",
-          path: ".github/auto-merge.yml",
-          type: "file",
-          encoding: "base64",
-          content: base64(configYaml),
-        });
-      },
-    ),
-
-    http.get(
-      "https://api.github.com/repos/:owner/:repo/compare/:basehead",
-      ({ request }) => {
-        compareCalls.push({ method: "GET", url: request.url });
-        return HttpResponse.json(state.compare);
-      },
-    ),
-
-    http.post(
-      "https://api.github.com/repos/:owner/:repo/merges",
-      async ({ request }) => {
-        const body = await request.clone().json().catch(() => undefined);
-        mergeCalls.push({ method: "POST", url: request.url, body });
-        mergeCallSeq += 1;
-        const status = state.mergeStatus;
-        if (status === 201) {
-          return HttpResponse.json(
-            {
-              sha: state.mergeSha,
-              commit: { message: (body as { commit_message?: string } | undefined)?.commit_message },
-            },
-            { status: 201 },
-          );
-        }
-        if (status === 204) {
-          return new HttpResponse(null, { status: 204 });
-        }
-        return HttpResponse.json({ message: `merge ${status}` }, { status });
-      },
-    ),
+        );
+      }
+      if (status === 204) {
+        return new HttpResponse(null, { status: 204 });
+      }
+      return HttpResponse.json({ message: `merge ${status}` }, { status });
+    }),
 
     http.get(
       "https://api.github.com/repos/:owner/:repo/branches/:branch",
@@ -188,7 +182,10 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
         const branch = params.branch as string;
         // After at least one POST /merges, return branchHeadAfter override (simulates target moving — D-10 stale-base trigger).
         if (mergeCallSeq > 0 && state.branchHeadAfter?.[branch]) {
-          return HttpResponse.json({ name: branch, commit: { sha: state.branchHeadAfter[branch] } });
+          return HttpResponse.json({
+            name: branch,
+            commit: { sha: state.branchHeadAfter[branch] },
+          });
         }
         const sha = state.branches[branch];
         if (sha === undefined) {
@@ -198,104 +195,99 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
       },
     ),
 
-    http.post(
-      "https://api.github.com/repos/:owner/:repo/git/refs",
-      async ({ request }) => {
-        const body = await request.clone().json().catch(() => undefined);
-        createRefCalls.push({ method: "POST", url: request.url, body });
-        if (state.refExists) {
-          return HttpResponse.json({ message: "Reference already exists" }, { status: 422 });
-        }
-        const ref = (body as { ref?: string } | undefined)?.ref ?? "refs/heads/unknown";
-        return HttpResponse.json({ ref, object: { sha: "ref-sha" } }, { status: 201 });
-      },
-    ),
+    http.post("https://api.github.com/repos/:owner/:repo/git/refs", async ({ request }) => {
+      const body = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      createRefCalls.push({ method: "POST", url: request.url, body });
+      if (state.refExists) {
+        return HttpResponse.json({ message: "Reference already exists" }, { status: 422 });
+      }
+      const ref = (body as { ref?: string } | undefined)?.ref ?? "refs/heads/unknown";
+      return HttpResponse.json({ ref, object: { sha: "ref-sha" } }, { status: 201 });
+    }),
 
-    http.get(
-      "https://api.github.com/repos/:owner/:repo/pulls",
-      ({ request }) => {
-        pullsListCalls.push({ method: "GET", url: request.url });
-        const url = new URL(request.url);
-        const headParam = url.searchParams.get("head");
-        const baseParam = url.searchParams.get("base");
-        const matches = state.openPRs.filter((pr) => {
-          const headRefMatches =
-            headParam === null || headParam.endsWith(`:${pr.head.ref}`) || headParam === pr.head.ref;
-          const baseMatches = baseParam === null || baseParam === pr.base.ref;
-          return headRefMatches && baseMatches;
-        });
-        return HttpResponse.json(
-          matches.map((m) => ({
-            html_url: m.html_url,
-            number: m.number,
-            head: { ref: m.head.ref },
-            base: { ref: m.base.ref },
-            state: "open",
-          })),
-        );
-      },
-    ),
+    http.get("https://api.github.com/repos/:owner/:repo/pulls", ({ request }) => {
+      pullsListCalls.push({ method: "GET", url: request.url });
+      const url = new URL(request.url);
+      const headParam = url.searchParams.get("head");
+      const baseParam = url.searchParams.get("base");
+      const matches = state.openPRs.filter((pr) => {
+        const headRefMatches =
+          headParam === null || headParam.endsWith(`:${pr.head.ref}`) || headParam === pr.head.ref;
+        const baseMatches = baseParam === null || baseParam === pr.base.ref;
+        return headRefMatches && baseMatches;
+      });
+      return HttpResponse.json(
+        matches.map((m) => ({
+          html_url: m.html_url,
+          number: m.number,
+          head: { ref: m.head.ref },
+          base: { ref: m.base.ref },
+          state: "open",
+        })),
+      );
+    }),
 
-    http.post(
-      "https://api.github.com/repos/:owner/:repo/pulls",
-      async ({ request }) => {
-        const body = await request.clone().json().catch(() => undefined);
-        pullsCreateCalls.push({ method: "POST", url: request.url, body });
-        if (state.pullsCreateStatus === 422) {
-          return HttpResponse.json({ message: "Validation Failed" }, { status: 422 });
-        }
-        const b = body as { head?: string; base?: string; title?: string; body?: string } | undefined;
-        return HttpResponse.json(
-          {
-            html_url: `https://github.com/owner/repo/pull/${pullsCreateCalls.length}`,
-            number: pullsCreateCalls.length,
-            head: { ref: b?.head ?? "unknown" },
-            base: { ref: b?.base ?? "unknown" },
-            title: b?.title,
-            body: b?.body,
-          },
-          { status: 201 },
-        );
-      },
-    ),
+    http.post("https://api.github.com/repos/:owner/:repo/pulls", async ({ request }) => {
+      const body = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      pullsCreateCalls.push({ method: "POST", url: request.url, body });
+      if (state.pullsCreateStatus === 422) {
+        return HttpResponse.json({ message: "Validation Failed" }, { status: 422 });
+      }
+      const b = body as { head?: string; base?: string; title?: string; body?: string } | undefined;
+      return HttpResponse.json(
+        {
+          html_url: `https://github.com/owner/repo/pull/${pullsCreateCalls.length}`,
+          number: pullsCreateCalls.length,
+          head: { ref: b?.head ?? "unknown" },
+          base: { ref: b?.base ?? "unknown" },
+          title: b?.title,
+          body: b?.body,
+        },
+        { status: 201 },
+      );
+    }),
 
-    http.get(
-      "https://api.github.com/repos/:owner/:repo/commits/:ref",
-      ({ params, request }) => {
-        commitCalls.push({ method: "GET", url: request.url });
-        const ref = params.ref as string;
-        return HttpResponse.json({
-          sha: ref,
-          author: state.commitAuthorLogin
-            ? { login: state.commitAuthorLogin, id: 1 }
-            : null,
-          commit: {
-            message: "commit",
-            author: { name: "Author", email: "author@example.com" },
-          },
-        });
-      },
-    ),
+    http.get("https://api.github.com/repos/:owner/:repo/commits/:ref", ({ params, request }) => {
+      commitCalls.push({ method: "GET", url: request.url });
+      const ref = params.ref as string;
+      return HttpResponse.json({
+        sha: ref,
+        author: state.commitAuthorLogin ? { login: state.commitAuthorLogin, id: 1 } : null,
+        commit: {
+          message: "commit",
+          author: { name: "Author", email: "author@example.com" },
+        },
+      });
+    }),
 
-    http.post(
-      "https://api.github.com/repos/:owner/:repo/check-runs",
-      async ({ request }) => {
-        const body = await request.clone().json().catch(() => undefined);
-        checkRunCreateCalls.push({ method: "POST", url: request.url, body });
-        return HttpResponse.json(
-          {
-            id: 100 + checkRunCreateCalls.length,
-            html_url: `https://github.com/owner/repo/runs/${100 + checkRunCreateCalls.length}`,
-          },
-          { status: 201 },
-        );
-      },
-    ),
+    http.post("https://api.github.com/repos/:owner/:repo/check-runs", async ({ request }) => {
+      const body = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      checkRunCreateCalls.push({ method: "POST", url: request.url, body });
+      return HttpResponse.json(
+        {
+          id: 100 + checkRunCreateCalls.length,
+          html_url: `https://github.com/owner/repo/runs/${100 + checkRunCreateCalls.length}`,
+        },
+        { status: 201 },
+      );
+    }),
 
     http.patch(
       "https://api.github.com/repos/:owner/:repo/check-runs/:check_run_id",
       async ({ params, request }) => {
-        const body = await request.clone().json().catch(() => undefined);
+        const body = await request
+          .clone()
+          .json()
+          .catch(() => undefined);
         checkRunPatchCalls.push({ method: "PATCH", url: request.url, body });
         return HttpResponse.json({ id: Number(params.check_run_id) });
       },
