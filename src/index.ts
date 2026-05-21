@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
 import { type CascadeJob, runCascade } from "./cascade/orchestrator.js";
+import { startCron } from "./cron/safetyNet.js";
 import { loadEnv } from "./env.js";
 import { initLogger } from "./log.js";
 import { NoopChannel } from "./notify/channel.js";
@@ -13,13 +14,14 @@ const appLog = initLogger(env);
 
 let app: FastifyInstance | undefined;
 let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>> | undefined;
+// cronHandle stored at module scope so 03-07 shutdown handler can call cronHandle?.stop() before drain.
+let cronHandle: { stop: () => Promise<void> } | undefined;
 
 try {
   const probot = createProbot(env);
 
   // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
   await probot.ready();
-  // Bot identity must be resolved before any push webhook can fire — loop prevention fails closed without it.
   await initBotIdentity(env);
   attachWebhookErrorRedactor(probot);
 
@@ -29,6 +31,8 @@ try {
     handler: runCascade,
     notify: new NoopChannel(),
   });
+
+  cronHandle = await startCron({ env, multiQueue, log: appLog });
 
   app = await buildServer({
     env,

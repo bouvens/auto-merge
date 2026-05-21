@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cron } from "croner";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
 import type { MultiQueue } from "../../src/webhook/multiQueue.js";
+import type { Octokit } from "@octokit/core";
 
 // Hoisted — vitest moves vi.mock calls to the top of the module before imports.
 vi.mock("../../src/auth.js", () => ({
@@ -23,41 +24,34 @@ import { getAppOctokit, getInstallationOctokit } from "../../src/auth.js";
 import { log as mockLog } from "../../src/log.js";
 import { runCronTick, startCron, stopCronGracefully } from "../../src/cron/safetyNet.js";
 
-function makeMockOctokit(listInstallationsPages: object[][], repoMap: Record<number, object[][]>) {
-  let instPageIdx = 0;
-  const appOctokit = {
-    request: vi.fn(async (path: string, params: { per_page?: number; page?: number } = {}) => {
-      if (path === "GET /app/installations") {
-        const page = (params.page ?? 1) - 1;
-        const data = listInstallationsPages[page] ?? [];
-        return { data };
-      }
-      throw new Error(`Unexpected app request: ${path}`);
+function makeFakeInstOctokit(repoPages: object[][]) {
+  return {
+    request: vi.fn(async (_path: string, params: { per_page?: number; page?: number } = {}) => {
+      const page = (params.page ?? 1) - 1;
+      const repos = repoPages[page] ?? [];
+      return { data: { repositories: repos } };
     }),
-  };
+  } as unknown as Octokit;
+}
 
-  const makeInstOctokit = (installationId: number) => ({
-    request: vi.fn(async (path: string, params: { per_page?: number; page?: number } = {}) => {
-      if (path === "GET /installation/repositories") {
-        const pages = repoMap[installationId] ?? [[]];
-        const page = (params.page ?? 1) - 1;
-        const repos = pages[page] ?? [];
-        return { data: { repositories: repos } };
-      }
-      throw new Error(`Unexpected inst request: ${path}`);
+function makeAppOctokit(installationPages: object[][]) {
+  return {
+    request: vi.fn(async (_path: string, params: { per_page?: number; page?: number } = {}) => {
+      const page = (params.page ?? 1) - 1;
+      const data = installationPages[page] ?? [];
+      return { data };
     }),
-  });
-
-  return { appOctokit, makeInstOctokit };
+  } as unknown as ReturnType<typeof getAppOctokit>;
 }
 
 function makeFakeMultiQueue(): MultiQueue<CascadeJob> & { calls: Array<{ key: string; jobId: string }> } {
   const calls: Array<{ key: string; jobId: string }> = [];
+  const enqueue = vi.fn((key: string, job: { id: string }) => {
+    calls.push({ key, jobId: job.id });
+  });
   return {
     calls,
-    enqueue: vi.fn((key: string, job: { id: string }) => {
-      calls.push({ key, jobId: job.id });
-    }),
+    enqueue,
     drain: vi.fn(async () => {}),
     size: vi.fn(() => calls.length),
     keyCount: vi.fn(() => 0),
@@ -70,7 +64,11 @@ describe("startCron — empty CRON_SCHEDULE", () => {
     const fakeEnv = { CRON_SCHEDULE: "", CRON_TZ: "UTC" } as Parameters<typeof startCron>[0]["env"];
     const fakeQueue = makeFakeMultiQueue();
 
-    const handle = await startCron({ env: fakeEnv, multiQueue: fakeQueue, log: mockLog as Parameters<typeof startCron>[0]["log"] });
+    const handle = await startCron({
+      env: fakeEnv,
+      multiQueue: fakeQueue,
+      log: mockLog as Parameters<typeof startCron>[0]["log"],
+    });
 
     expect(infoSpy).toHaveBeenCalledWith(expect.objectContaining({ event: "cron_disabled" }), "cron");
     await expect(handle.stop()).resolves.toBeUndefined();
@@ -88,18 +86,18 @@ describe("protect:true skips overlapping tick", () => {
 
   it("only one tick runs when a previous tick is still executing", async () => {
     const tickStarts: number[] = [];
-    let release: (() => void) | null = null;
+    let releaseRef: { fn: (() => void) | null } = { fn: null };
 
     const c = new Cron("* * * * * *", { protect: true }, async () => {
       tickStarts.push(Date.now());
       await new Promise<void>((r) => {
-        release = r;
+        releaseRef.fn = r;
       });
     });
 
     await vi.advanceTimersByTimeAsync(1000); // tick 1 starts and blocks
     await vi.advanceTimersByTimeAsync(2000); // ticks 2 & 3 should be skipped
-    release?.();
+    releaseRef.fn?.();
     c.stop();
 
     expect(tickStarts).toHaveLength(1);
@@ -119,15 +117,12 @@ describe("runCronTick — pagination and enqueue", () => {
     const repo3 = { name: "repo-c", full_name: "org2/repo-c", owner: { login: "org2" } };
     const repo4 = { name: "repo-d", full_name: "org2/repo-d", owner: { login: "org2" } };
 
-    const { appOctokit, makeInstOctokit } = makeMockOctokit(
-      [[inst1, inst2]],
-      { 10: [[repo1, repo2]], 20: [[repo3, repo4]] },
-    );
-
-    vi.mocked(getAppOctokit).mockReturnValue(appOctokit as ReturnType<typeof getAppOctokit>);
-    vi.mocked(getInstallationOctokit).mockImplementation(async (id: number) =>
-      makeInstOctokit(id) as Awaited<ReturnType<typeof getInstallationOctokit>>,
-    );
+    const appOck = makeAppOctokit([[inst1, inst2]]);
+    vi.mocked(getAppOctokit).mockReturnValue(appOck);
+    vi.mocked(getInstallationOctokit).mockImplementation(async (id: number) => {
+      if (id === 10) return makeFakeInstOctokit([[repo1, repo2]]);
+      return makeFakeInstOctokit([[repo3, repo4]]);
+    });
 
     const fakeQueue = makeFakeMultiQueue();
     const result = await runCronTick({ multiQueue: fakeQueue });
@@ -149,19 +144,18 @@ describe("runCronTick — pagination and enqueue", () => {
     const inst2 = { id: 20, suspended_at: null, account: { login: "org2" } };
     const repo = { name: "repo-x", full_name: "org2/repo-x", owner: { login: "org2" } };
 
-    const { appOctokit, makeInstOctokit } = makeMockOctokit(
-      [[inst1, inst2]],
-      { 20: [[repo]] },
-    );
-
-    vi.mocked(getAppOctokit).mockReturnValue(appOctokit as ReturnType<typeof getAppOctokit>);
-    vi.mocked(getInstallationOctokit).mockImplementation(async (id: number) =>
-      makeInstOctokit(id) as Awaited<ReturnType<typeof getInstallationOctokit>>,
+    const appOck = makeAppOctokit([[inst1, inst2]]);
+    vi.mocked(getAppOctokit).mockReturnValue(appOck);
+    vi.mocked(getInstallationOctokit).mockImplementation(async (_id: number) =>
+      makeFakeInstOctokit([[repo]]),
     );
 
     const debugSpy = vi.spyOn(mockLog, "debug");
     const fakeQueue = makeFakeMultiQueue();
-    const result = await runCronTick({ multiQueue: fakeQueue, log: mockLog as Parameters<typeof runCronTick>[0]["log"] });
+    const result = await runCronTick({
+      multiQueue: fakeQueue,
+      log: mockLog as Parameters<typeof runCronTick>[0]["log"],
+    });
 
     expect(result.installations).toBe(1);
     expect(result.repos_scanned).toBe(1);
@@ -177,30 +171,26 @@ describe("runCronTick — pagination and enqueue", () => {
     const inst2 = { id: 20, suspended_at: null, account: { login: "org2" } };
     const repo = { name: "repo-ok", full_name: "org2/repo-ok", owner: { login: "org2" } };
 
-    const appOctokit = {
-      request: vi.fn(async (_path: string, _params: object) => ({
-        data: [inst1, inst2],
-      })),
-    };
-
-    // inst 10 throws 403, inst 20 is fine
-    vi.mocked(getAppOctokit).mockReturnValue(appOctokit as ReturnType<typeof getAppOctokit>);
+    const appOck = makeAppOctokit([[inst1, inst2]]);
+    vi.mocked(getAppOctokit).mockReturnValue(appOck);
     vi.mocked(getInstallationOctokit).mockImplementation(async (id: number) => {
       if (id === 10) {
-        const err = Object.assign(new Error("Forbidden"), { status: 403 });
-        const badOctokit = {
-          request: vi.fn(async () => { throw err; }),
-        };
-        return badOctokit as Awaited<ReturnType<typeof getInstallationOctokit>>;
+        // Token mint succeeds but repo enumeration throws 403
+        return {
+          request: vi.fn(async () => {
+            throw Object.assign(new Error("Forbidden"), { status: 403 });
+          }),
+        } as unknown as Octokit;
       }
-      return {
-        request: vi.fn(async () => ({ data: { repositories: [repo] } })),
-      } as Awaited<ReturnType<typeof getInstallationOctokit>>;
+      return makeFakeInstOctokit([[repo]]);
     });
 
     const warnSpy = vi.spyOn(mockLog, "warn");
     const fakeQueue = makeFakeMultiQueue();
-    const result = await runCronTick({ multiQueue: fakeQueue, log: mockLog as Parameters<typeof runCronTick>[0]["log"] });
+    const result = await runCronTick({
+      multiQueue: fakeQueue,
+      log: mockLog as Parameters<typeof runCronTick>[0]["log"],
+    });
 
     expect(result.repos_scanned).toBe(1);
     expect(fakeQueue.enqueue).toHaveBeenCalledTimes(1);
