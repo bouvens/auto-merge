@@ -2,9 +2,11 @@ import Fastify from "fastify";
 import rawBodyPlugin from "fastify-raw-body";
 import type pino from "pino";
 import type { Probot } from "probot";
+import type { PushJob } from "./cascade/orchestrator.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
 import { registerHandlers } from "./webhook/handler.js";
+import { registerPushHandler } from "./webhook/pushHandler.js";
 import type { Queue } from "./webhook/queue.js";
 
 export interface BuildServerDeps {
@@ -15,7 +17,7 @@ export interface BuildServerDeps {
   // Optional: Plan 05 will use this to register /webhook route
   probot?: Probot;
   dedup?: { seen(id: string): boolean; mark(id: string): void };
-  queue?: Queue<{ name: string }>;
+  queue?: Queue<PushJob>;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -54,8 +56,9 @@ export async function buildServer(deps: BuildServerDeps) {
 
   if (deps.probot && deps.dedup && deps.queue) {
     registerHandlers(deps.probot);
+    registerPushHandler(deps.probot, { queue: deps.queue });
 
-    const { probot, dedup, queue } = deps;
+    const { probot, dedup } = deps;
 
     // config.rawBody:true opts this route into raw body capture; verifyAndReceive requires the unparsed string for HMAC.
     app.post("/webhook", { config: { rawBody: true } }, async (req, reply) => {
@@ -91,11 +94,6 @@ export async function buildServer(deps: BuildServerDeps) {
         return reply.code(202).send();
       }
       dedup.mark(id);
-
-      // Only enqueue events that trigger cascade logic; lifecycle events are handled inside verifyAndReceive via probot.on().
-      if (name === "push" || name === "repository_dispatch") {
-        queue.enqueue({ id, payload: { name } });
-      }
 
       return reply.code(202).send();
     });
