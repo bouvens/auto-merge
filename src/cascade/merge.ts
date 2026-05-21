@@ -2,11 +2,15 @@ import type { Octokit } from "@octokit/core";
 import { log } from "../log.js";
 import * as checkRun from "./checkRun.js";
 import { buildCommitMessage, type CompareData } from "./commitMessage.js";
+import { type Endpoint, mapError } from "./errorMap.js";
+import { protectionCheck } from "./protectionCheck.js";
 
 export interface MergeStepDeps {
   octokit: Octokit;
   owner: string;
   repo: string;
+  // GitHub App slug — restrictions.apps[].slug uses the raw slug without the [bot] suffix.
+  appSlug: string;
 }
 
 export interface MergeStepOpts {
@@ -31,6 +35,21 @@ export type MergeOutcome =
       status?: number;
       message: string;
       check_run_id: number | null;
+    }
+  | {
+      outcome: "permission_error";
+      // permission_error kind distinguishes API-permission failure from real conflicts / unknown errors.
+      endpoint: Endpoint;
+      status: number;
+      missing_permission: string;
+      check_run_id: number | null;
+    }
+  | {
+      outcome: "protection_blocked";
+      rule: string;
+      source_sha: string;
+      check_run_id: number | null;
+      check_run_html_url: string | null;
     };
 
 interface OctokitErrorShape {
@@ -121,6 +140,27 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
       .data;
   } catch (err) {
     const { status, message } = classifyError(err);
+    const mapped = mapError("compare", status ?? 0, opts.tgt);
+    if (mapped) {
+      log.error(
+        {
+          ...logCtx,
+          err,
+          status,
+          endpoint: "compare",
+          missing_permission: mapped.missing_permission,
+          event: "cascade_permission_error",
+        },
+        "cascade",
+      );
+      return {
+        outcome: "permission_error",
+        endpoint: "compare",
+        status: status!,
+        missing_permission: mapped.missing_permission,
+        check_run_id: null,
+      };
+    }
     log.error({ ...logCtx, err, status, event: "cascade_step_unknown_error" }, "cascade");
     return { outcome: "unknown_error", status, message, check_run_id: null };
   }
@@ -128,6 +168,40 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
   if (compare.ahead_by === 0) {
     log.info({ ...logCtx, event: "cascade_step_skipped" }, "cascade");
     return { outcome: "skipped", reason: "ahead_by_zero" };
+  }
+
+  // Protection pre-flight (OPS-04): skip Check Run + merge attempt entirely when protection blocks — fewer API calls.
+  const protection = await protectionCheck(
+    { octokit: deps.octokit, owner: deps.owner, repo: deps.repo, appSlug: deps.appSlug },
+    opts.tgt,
+  );
+  if ("permission_error" in protection && protection.permission_error) {
+    const mapped = mapError("branches_protection", protection.status, opts.tgt);
+    await checkRun.createFailureCheckRun(
+      { octokit: deps.octokit, owner: deps.owner, repo: deps.repo },
+      {
+        head_sha: opts.source_sha,
+        name: `auto-merge: ${opts.src} → ${opts.tgt}`,
+        title: `Failed ${opts.src} → ${opts.tgt}`,
+        summary: mapped?.summary ?? "Cannot pre-flight branch protection",
+      },
+    );
+    return {
+      outcome: "permission_error",
+      endpoint: "branches_protection",
+      status: protection.status,
+      missing_permission: mapped?.missing_permission ?? "administration:read",
+      check_run_id: null,
+    };
+  }
+  if ("blocked" in protection && protection.blocked) {
+    return {
+      outcome: "protection_blocked",
+      rule: protection.rules[0]!,
+      source_sha: opts.source_sha,
+      check_run_id: null,
+      check_run_html_url: null,
+    };
   }
 
   const targetHeadBefore = compare.base_commit.sha;
@@ -180,6 +254,27 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
   const { status, message } = classifyError(first.err);
 
   if (status !== 409) {
+    const mapped = mapError("merges", status ?? 0, opts.tgt);
+    if (mapped) {
+      log.error(
+        {
+          ...logCtx,
+          err: first.err,
+          status,
+          endpoint: "merges",
+          missing_permission: mapped.missing_permission,
+          event: "cascade_permission_error",
+        },
+        "cascade",
+      );
+      return {
+        outcome: "permission_error",
+        endpoint: "merges",
+        status: status!,
+        missing_permission: mapped.missing_permission,
+        check_run_id,
+      };
+    }
     log.error(
       { ...logCtx, err: first.err, status, event: "cascade_step_unknown_error" },
       "cascade",
@@ -198,6 +293,27 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
     targetHeadAfter = (branchResp as { data: { commit: { sha: string } } }).data.commit.sha;
   } catch (err) {
     const cls = classifyError(err);
+    const mapped = mapError("branches", cls.status ?? 0, opts.tgt);
+    if (mapped) {
+      log.error(
+        {
+          ...logCtx,
+          err,
+          status: cls.status,
+          endpoint: "branches",
+          missing_permission: mapped.missing_permission,
+          event: "cascade_permission_error",
+        },
+        "cascade",
+      );
+      return {
+        outcome: "permission_error",
+        endpoint: "branches",
+        status: cls.status!,
+        missing_permission: mapped.missing_permission,
+        check_run_id,
+      };
+    }
     log.error({ ...logCtx, err, event: "cascade_step_unknown_error" }, "cascade");
     return {
       outcome: "unknown_error",
@@ -266,6 +382,28 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
       source_sha: opts.source_sha,
       check_run_id,
       check_run_html_url,
+    };
+  }
+
+  const retryMapped = mapError("merges", retryCls.status ?? 0, opts.tgt);
+  if (retryMapped) {
+    log.error(
+      {
+        ...logCtx,
+        err: retry.err,
+        status: retryCls.status,
+        endpoint: "merges",
+        missing_permission: retryMapped.missing_permission,
+        event: "cascade_permission_error",
+      },
+      "cascade",
+    );
+    return {
+      outcome: "permission_error",
+      endpoint: "merges",
+      status: retryCls.status!,
+      missing_permission: retryMapped.missing_permission,
+      check_run_id,
     };
   }
 
