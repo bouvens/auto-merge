@@ -12,3 +12,5 @@ coverage
 README.md
 biome.json
 vitest.config.ts
+# Exclude host dist/ so a local tsc build doesn't shadow the builder stage output (D-17).
+dist/
