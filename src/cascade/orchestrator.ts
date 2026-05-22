@@ -4,7 +4,6 @@ import type { Config } from "../config/schema.js";
 import { loadConfig } from "../config/loader.js";
 import { log } from "../log.js";
 import type { NotificationChannel } from "../notify/channel.js";
-import { NoopChannel } from "../notify/channel.js";
 import type { Handler, Job } from "../webhook/queue.js";
 import { completeFailure, createInProgress } from "./checkRun.js";
 import { createConflictPR } from "./conflict.js";
@@ -335,6 +334,3 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
     }
   };
 }
-
-// Backward-compatible export wired with NoopChannel; index.ts uses makeRunCascade directly.
-export const runCascade: Handler<CascadeJob> = makeRunCascade({ notify: new NoopChannel() });
