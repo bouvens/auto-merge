@@ -1,14 +1,17 @@
 import { LRUCache } from "lru-cache";
+import type { Config } from "../config/schema.js";
+import type { Env } from "../env.js";
 import { log } from "../log.js";
 import type { NotificationChannel, NotifyEvent } from "./channel.js";
 import { formatSlack } from "./formatters/slack.js";
-import { type RetryOpts, withRetry, HttpError } from "./retry.js";
-import type { Config } from "../config/schema.js";
-import type { Env } from "../env.js";
+import { HttpError, type RetryOpts, withRetry } from "./retry.js";
 
 export interface SlackChannelDeps {
   webhookUrl: string;
-  env: Pick<Env, "NOTIFY_DEDUP_TTL_MS" | "NOTIFY_DEDUP_MAX" | "NOTIFY_TIMEOUT_MS" | "NOTIFY_RETRY_ATTEMPTS">;
+  env: Pick<
+    Env,
+    "NOTIFY_DEDUP_TTL_MS" | "NOTIFY_DEDUP_MAX" | "NOTIFY_TIMEOUT_MS" | "NOTIFY_RETRY_ATTEMPTS"
+  >;
   getConfig: (repo: string) => Config | undefined;
 }
 
@@ -17,12 +20,17 @@ function dedupKey(event: NotifyEvent): string {
   const k = event.kind;
   if (k === "queue_overflow") return `_:${event.key}:_:${k}:${event.dropped_id}`;
   if (k === "config_invalid") return `${event.installation_id}:${event.repo}:pre-resolve:${k}`;
-  if (k === "permission_error") return `${event.installation_id}:${event.repo}:${event.endpoint}:${event.status}:${k}`;
+  if (k === "permission_error")
+    return `${event.installation_id}:${event.repo}:${event.endpoint}:${event.status}:${k}`;
   // cascade_conflict and protection_blocked use run_id as the uniqueness carrier.
   return `${event.installation_id}:${event.repo}:${event.run_id}:${k}`;
 }
 
-async function sendSlack(url: string, body: Record<string, unknown>, timeoutMs: number): Promise<void> {
+async function sendSlack(
+  url: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<void> {
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -33,15 +41,27 @@ async function sendSlack(url: string, body: Record<string, unknown>, timeoutMs: 
   if (!resp.ok) {
     const errText = await resp.text().catch(() => "");
     const retryAfterHeader = resp.headers.get("Retry-After");
-    const retryAfterMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 || undefined : undefined;
+    const retryAfterMs = retryAfterHeader
+      ? parseInt(retryAfterHeader, 10) * 1000 || undefined
+      : undefined;
     throw new HttpError(resp.status, errText, retryAfterMs);
   }
   // Slack returns 200 with text body "ok" — do not call resp.json().
 }
 
+const DISABLED_REPOS_MAX = 1024;
+// 24h: observability returns daily — misconfig re-warns instead of being silenced forever
+const DISABLED_REPOS_TTL_MS = 24 * 60 * 60 * 1000;
+
 export class SlackChannel implements NotificationChannel {
   private readonly dedup: LRUCache<string, true>;
-  private readonly disabledRepos = new Set<string>();
+  // LRU with 24h TTL — bounds memory across many-repo installations AND restores observability for misconfig (D-03)
+  private readonly disabledRepos = new LRUCache<string, true>({
+    max: DISABLED_REPOS_MAX,
+    ttl: DISABLED_REPOS_TTL_MS,
+    ttlAutopurge: true,
+    perf: { now: () => Date.now() },
+  });
   private readonly retryOpts: RetryOpts;
 
   constructor(private readonly deps: SlackChannelDeps) {
@@ -74,15 +94,14 @@ export class SlackChannel implements NotificationChannel {
       if (!config?.notifications?.slack) {
         if (!this.disabledRepos.has(repo)) {
           log.info({ event: "notifications_disabled_for_repo", repo, channel: "slack" }, "notify");
-          this.disabledRepos.add(repo);
+          this.disabledRepos.set(repo, true);
         }
         return;
       }
     }
 
-    const slackChannel = repo !== undefined
-      ? this.deps.getConfig(repo)?.notifications?.slack?.channel
-      : undefined;
+    const slackChannel =
+      repo !== undefined ? this.deps.getConfig(repo)?.notifications?.slack?.channel : undefined;
 
     const body: Record<string, unknown> = { text: formatSlack(event) };
     if (slackChannel) {
@@ -90,20 +109,26 @@ export class SlackChannel implements NotificationChannel {
     }
 
     try {
-      await withRetry(() => sendSlack(this.deps.webhookUrl, body, this.deps.env.NOTIFY_TIMEOUT_MS), this.retryOpts);
+      await withRetry(
+        () => sendSlack(this.deps.webhookUrl, body, this.deps.env.NOTIFY_TIMEOUT_MS),
+        this.retryOpts,
+      );
       this.dedup.set(key, true);
       log.debug({ event: "notify_sent", channel: "slack", kind: event.kind, repo }, "notify");
     } catch (err) {
-      log.warn({
-        event: "notify_delivery_failed",
-        channel: "slack",
-        kind: event.kind,
-        repo,
-        attempt_count: this.retryOpts.attempts,
-        final_error_class: err instanceof Error ? err.name : "unknown",
-        final_status: err instanceof HttpError ? err.status : undefined,
-        event_payload: event,
-      }, "notify");
+      log.warn(
+        {
+          event: "notify_delivery_failed",
+          channel: "slack",
+          kind: event.kind,
+          repo,
+          attempt_count: this.retryOpts.attempts,
+          final_error_class: err instanceof Error ? err.name : "unknown",
+          final_status: err instanceof HttpError ? err.status : undefined,
+          event_payload: event,
+        },
+        "notify",
+      );
     }
   }
 }

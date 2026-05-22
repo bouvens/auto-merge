@@ -1,14 +1,17 @@
 import { LRUCache } from "lru-cache";
+import type { Config } from "../config/schema.js";
+import type { Env } from "../env.js";
 import { log } from "../log.js";
 import type { NotificationChannel, NotifyEvent } from "./channel.js";
 import { formatTelegram } from "./formatters/telegram.js";
-import { type RetryOpts, withRetry, HttpError } from "./retry.js";
-import type { Config } from "../config/schema.js";
-import type { Env } from "../env.js";
+import { HttpError, type RetryOpts, withRetry } from "./retry.js";
 
 export interface TelegramChannelDeps {
   botToken: string;
-  env: Pick<Env, "NOTIFY_DEDUP_TTL_MS" | "NOTIFY_DEDUP_MAX" | "NOTIFY_TIMEOUT_MS" | "NOTIFY_RETRY_ATTEMPTS">;
+  env: Pick<
+    Env,
+    "NOTIFY_DEDUP_TTL_MS" | "NOTIFY_DEDUP_MAX" | "NOTIFY_TIMEOUT_MS" | "NOTIFY_RETRY_ATTEMPTS"
+  >;
   getConfig: (repo: string) => Config | undefined;
 }
 
@@ -28,7 +31,8 @@ function dedupKey(event: NotifyEvent): string {
   const k = event.kind;
   if (k === "queue_overflow") return `_:${event.key}:_:${k}:${event.dropped_id}`;
   if (k === "config_invalid") return `${event.installation_id}:${event.repo}:pre-resolve:${k}`;
-  if (k === "permission_error") return `${event.installation_id}:${event.repo}:${event.endpoint}:${event.status}:${k}`;
+  if (k === "permission_error")
+    return `${event.installation_id}:${event.repo}:${event.endpoint}:${event.status}:${k}`;
   // cascade_conflict and protection_blocked use run_id as the uniqueness carrier.
   return `${event.installation_id}:${event.repo}:${event.run_id}:${k}`;
 }
@@ -40,7 +44,11 @@ interface TelegramResponse {
   parameters?: { retry_after?: number };
 }
 
-async function sendTelegram(url: string, body: Record<string, unknown>, timeoutMs: number): Promise<void> {
+async function sendTelegram(
+  url: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<void> {
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -48,7 +56,7 @@ async function sendTelegram(url: string, body: Record<string, unknown>, timeoutM
     signal: AbortSignal.timeout(timeoutMs),
   });
 
-  const json = await resp.json().catch(() => null) as TelegramResponse | null;
+  const json = (await resp.json().catch(() => null)) as TelegramResponse | null;
 
   if (json !== null && json.ok && resp.ok) {
     return;
@@ -57,13 +65,25 @@ async function sendTelegram(url: string, body: Record<string, unknown>, timeoutM
   const status = json?.error_code ?? resp.status;
   const description = json?.description ?? `http ${resp.status}`;
   // retry_after from Telegram is in seconds — convert to ms for HttpError.
-  const retryAfterMs = json?.parameters?.retry_after ? json.parameters.retry_after * 1000 : undefined;
+  const retryAfterMs = json?.parameters?.retry_after
+    ? json.parameters.retry_after * 1000
+    : undefined;
   throw new HttpError(status, description, retryAfterMs);
 }
 
+const DISABLED_REPOS_MAX = 1024;
+// 24h: observability returns daily — misconfig re-warns instead of being silenced forever
+const DISABLED_REPOS_TTL_MS = 24 * 60 * 60 * 1000;
+
 export class TelegramChannel implements NotificationChannel {
   private readonly dedup: LRUCache<string, true>;
-  private readonly disabledRepos = new Set<string>();
+  // LRU with 24h TTL — bounds memory across many-repo installations AND restores observability for misconfig (D-03)
+  private readonly disabledRepos = new LRUCache<string, true>({
+    max: DISABLED_REPOS_MAX,
+    ttl: DISABLED_REPOS_TTL_MS,
+    ttlAutopurge: true,
+    perf: { now: () => Date.now() },
+  });
   private readonly retryOpts: RetryOpts;
 
   constructor(private readonly deps: TelegramChannelDeps) {
@@ -93,7 +113,10 @@ export class TelegramChannel implements NotificationChannel {
 
     // queue_overflow has no repo → no chat_id fallback; skip silently.
     if (repo === undefined) {
-      log.debug({ event: "notify_skipped_no_config", channel: "telegram", kind: event.kind }, "notify");
+      log.debug(
+        { event: "notify_skipped_no_config", channel: "telegram", kind: event.kind },
+        "notify",
+      );
       return;
     }
 
@@ -101,7 +124,7 @@ export class TelegramChannel implements NotificationChannel {
     if (!config?.notifications?.telegram) {
       if (!this.disabledRepos.has(repo)) {
         log.info({ event: "notifications_disabled_for_repo", repo, channel: "telegram" }, "notify");
-        this.disabledRepos.add(repo);
+        this.disabledRepos.set(repo, true);
       }
       return;
     }
@@ -115,20 +138,26 @@ export class TelegramChannel implements NotificationChannel {
     };
 
     try {
-      await withRetry(() => sendTelegram(url, body, this.deps.env.NOTIFY_TIMEOUT_MS), this.retryOpts);
+      await withRetry(
+        () => sendTelegram(url, body, this.deps.env.NOTIFY_TIMEOUT_MS),
+        this.retryOpts,
+      );
       this.dedup.set(key, true);
       log.debug({ event: "notify_sent", channel: "telegram", kind: event.kind, repo }, "notify");
     } catch (err) {
-      log.warn({
-        event: "notify_delivery_failed",
-        channel: "telegram",
-        kind: event.kind,
-        repo,
-        attempt_count: this.retryOpts.attempts,
-        final_error_class: err instanceof Error ? err.name : "unknown",
-        final_status: err instanceof HttpError ? err.status : undefined,
-        event_payload: event,
-      }, "notify");
+      log.warn(
+        {
+          event: "notify_delivery_failed",
+          channel: "telegram",
+          kind: event.kind,
+          repo,
+          attempt_count: this.retryOpts.attempts,
+          final_error_class: err instanceof Error ? err.name : "unknown",
+          final_status: err instanceof HttpError ? err.status : undefined,
+          event_payload: event,
+        },
+        "notify",
+      );
     }
   }
 }

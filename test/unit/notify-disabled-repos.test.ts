@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotifyEvent } from "../../src/notify/channel.js";
 import type { Config } from "../../src/config/schema.js";
+import type { NotifyEvent } from "../../src/notify/channel.js";
 
 const DISABLED_REPOS_TTL_MS = 24 * 60 * 60 * 1000;
 const DISABLED_REPOS_MAX = 1024;
@@ -51,9 +51,11 @@ describe("SlackChannel.disabledRepos — LRU<string,true> with 24h TTL (D-03)", 
   }
 
   function disabledLogCalls(repo: string) {
-    return infoSpy.mock.calls.filter(([obj]) => {
-      const o = obj as { event?: string; repo?: string; channel?: string };
-      return o.event === "notifications_disabled_for_repo" && o.repo === repo && o.channel === "slack";
+    return (infoSpy.mock.calls as unknown as unknown[][]).filter((args) => {
+      const o = args[0] as { event?: string; repo?: string; channel?: string };
+      return (
+        o.event === "notifications_disabled_for_repo" && o.repo === repo && o.channel === "slack"
+      );
     });
   }
 
@@ -62,7 +64,11 @@ describe("SlackChannel.disabledRepos — LRU<string,true> with 24h TTL (D-03)", 
     await channel.notify(makeEvent("org/a"));
     expect(disabledLogCalls("org/a")).toHaveLength(1);
     expect(infoSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "notifications_disabled_for_repo", repo: "org/a", channel: "slack" }),
+      expect.objectContaining({
+        event: "notifications_disabled_for_repo",
+        repo: "org/a",
+        channel: "slack",
+      }),
       expect.anything(),
     );
   });
@@ -125,9 +131,11 @@ describe("TelegramChannel.disabledRepos — LRU<string,true> with 24h TTL (D-03)
   }
 
   function disabledLogCalls(repo: string) {
-    return infoSpy.mock.calls.filter(([obj]) => {
-      const o = obj as { event?: string; repo?: string; channel?: string };
-      return o.event === "notifications_disabled_for_repo" && o.repo === repo && o.channel === "telegram";
+    return (infoSpy.mock.calls as unknown as unknown[][]).filter((args) => {
+      const o = args[0] as { event?: string; repo?: string; channel?: string };
+      return (
+        o.event === "notifications_disabled_for_repo" && o.repo === repo && o.channel === "telegram"
+      );
     });
   }
 
@@ -136,7 +144,11 @@ describe("TelegramChannel.disabledRepos — LRU<string,true> with 24h TTL (D-03)
     await channel.notify(makeEvent("org/a"));
     expect(disabledLogCalls("org/a")).toHaveLength(1);
     expect(infoSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "notifications_disabled_for_repo", repo: "org/a", channel: "telegram" }),
+      expect.objectContaining({
+        event: "notifications_disabled_for_repo",
+        repo: "org/a",
+        channel: "telegram",
+      }),
       expect.anything(),
     );
   });
