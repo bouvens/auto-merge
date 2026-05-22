@@ -5,7 +5,7 @@ import type { Probot } from "probot";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProbot, initBotIdentity } from "../../src/auth.js";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
-import { runCascade } from "../../src/cascade/orchestrator.js";
+import { makeRunCascade } from "../../src/cascade/orchestrator.js";
 import type { Env } from "../../src/env.js";
 import { log } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
@@ -92,6 +92,7 @@ beforeAll(async () => {
   await initBotIdentity(env, () => new Octokit({ baseUrl: "https://api.github.com" }));
 
   processedJobs = [];
+  const runCascade = makeRunCascade({ notify: new NoopChannel() });
   queue = createMultiQueue<CascadeJob>({
     perKeyMax: 16,
     globalMax: 100,

@@ -9,7 +9,7 @@ vi.mock("../../src/auth.js", () => ({
 }));
 
 import type { CascadeJob, PushHeadCommit, PushJob } from "../../src/cascade/orchestrator.js";
-import { makeRunCascade, runCascade } from "../../src/cascade/orchestrator.js";
+import { makeRunCascade } from "../../src/cascade/orchestrator.js";
 import type { Config } from "../../src/config/schema.js";
 import { log } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
@@ -86,6 +86,8 @@ function makeJob(overrides: Partial<PushJob> = {}): Job<PushJob> {
 }
 
 describe("cascade-flow integration (msw + real Octokit)", () => {
+  const runCascade = makeRunCascade({ notify: new NoopChannel() });
+
   it("SC#1 + SC#5: skip first pair (ahead_by=0), merge second pair (ahead_by=2)", async () => {
     let callIdx = 0;
     harness.server.use(
