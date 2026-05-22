@@ -3,9 +3,10 @@ import rawBodyPlugin from "fastify-raw-body";
 import type pino from "pino";
 import type { Probot } from "probot";
 import type { CascadeJob } from "./cascade/orchestrator.js";
+import { registerDispatchHandler } from "./dispatch/handler.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
-import { registerDispatchHandler } from "./dispatch/handler.js";
+import type { NotificationChannel } from "./notify/channel.js";
 import { registerHandlers } from "./webhook/handler.js";
 import type { MultiQueue } from "./webhook/multiQueue.js";
 import { registerPushHandler } from "./webhook/pushHandler.js";
@@ -19,6 +20,8 @@ export interface BuildServerDeps {
   probot?: Probot;
   dedup?: { seen(id: string): boolean; mark(id: string): void };
   queue?: MultiQueue<CascadeJob>;
+  // D-01: clustered with webhook-wiring deps — gated together so push handler always has notify forwarded into loadConfig
+  notify?: NotificationChannel;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -55,9 +58,9 @@ export async function buildServer(deps: BuildServerDeps) {
     return { status: "ready" };
   });
 
-  if (deps.probot && deps.dedup && deps.queue) {
+  if (deps.probot && deps.dedup && deps.queue && deps.notify) {
     registerHandlers(deps.probot);
-    registerPushHandler(deps.probot, { queue: deps.queue });
+    registerPushHandler(deps.probot, { queue: deps.queue, notify: deps.notify });
     registerDispatchHandler(deps.probot, { queue: deps.queue });
 
     const { probot, dedup } = deps;

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
-import { makeRunCascade, type CascadeJob } from "./cascade/orchestrator.js";
+import { type CascadeJob, makeRunCascade } from "./cascade/orchestrator.js";
 import { getRepoConfig } from "./config/loader.js";
 import { startCron } from "./cron/safetyNet.js";
 import { loadEnv } from "./env.js";
@@ -10,9 +10,9 @@ import { MultiChannel } from "./notify/dispatcher.js";
 import { SlackChannel } from "./notify/slack.js";
 import { TelegramChannel } from "./notify/telegram.js";
 import { buildServer } from "./server.js";
+import { makeShutdown } from "./shutdown.js";
 import { dedup } from "./webhook/dedup.js";
 import { createMultiQueue } from "./webhook/multiQueue.js";
-import { makeShutdown } from "./shutdown.js";
 
 const env = loadEnv();
 const appLog = initLogger(env);
@@ -32,16 +32,28 @@ try {
 
   const channels: NotificationChannel[] = [];
   if (env.SLACK_WEBHOOK_URL) {
-    channels.push(new SlackChannel({ webhookUrl: env.SLACK_WEBHOOK_URL, env, getConfig: (repo) => {
-      const [owner, repoName] = repo.split("/");
-      return getRepoConfig(owner ?? "", repoName ?? "");
-    }}));
+    channels.push(
+      new SlackChannel({
+        webhookUrl: env.SLACK_WEBHOOK_URL,
+        env,
+        getConfig: (repo) => {
+          const [owner, repoName] = repo.split("/");
+          return getRepoConfig(owner ?? "", repoName ?? "");
+        },
+      }),
+    );
   }
   if (env.TELEGRAM_BOT_TOKEN) {
-    channels.push(new TelegramChannel({ botToken: env.TELEGRAM_BOT_TOKEN, env, getConfig: (repo) => {
-      const [owner, repoName] = repo.split("/");
-      return getRepoConfig(owner ?? "", repoName ?? "");
-    }}));
+    channels.push(
+      new TelegramChannel({
+        botToken: env.TELEGRAM_BOT_TOKEN,
+        env,
+        getConfig: (repo) => {
+          const [owner, repoName] = repo.split("/");
+          return getRepoConfig(owner ?? "", repoName ?? "");
+        },
+      }),
+    );
   }
   const notify = new MultiChannel(channels);
 
@@ -61,6 +73,7 @@ try {
     probot,
     dedup,
     queue: multiQueue,
+    notify,
   });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   appLog.info({ port: env.PORT }, "listening");

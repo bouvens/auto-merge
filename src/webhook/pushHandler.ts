@@ -5,10 +5,13 @@ import type { CascadeJob, PushJob } from "../cascade/orchestrator.js";
 import { sourceShaDedup } from "../cascade/sourceShaDedup.js";
 import { loadConfig } from "../config/loader.js";
 import { log } from "../log.js";
+import type { NotificationChannel } from "../notify/channel.js";
 import { buildKey, type MultiQueue } from "./multiQueue.js";
 
 export interface PushHandlerDeps {
   queue: MultiQueue<CascadeJob>;
+  // D-01: notify is forwarded into loadConfig so push-path invalid configs reach Slack/Telegram (cron/dispatch path already does this)
+  notify: NotificationChannel;
 }
 
 interface PushPayloadShape {
@@ -49,7 +52,14 @@ export async function handlePushEvent(ctx: PushContext, deps: PushHandlerDeps): 
   const repo = payload.repository.name;
   const after = payload.after;
 
-  const { config, errors } = await loadConfig({ octokit: ctx.octokit, owner, repo, sha: after, installation_id: payload.installation.id });
+  const { config, errors } = await loadConfig({
+    octokit: ctx.octokit,
+    owner,
+    repo,
+    sha: after,
+    installation_id: payload.installation.id,
+    notify: deps.notify,
+  });
   if (errors.length > 0 || !config) {
     log.warn({ delivery_id, owner, repo, event: "push_config_invalid" }, "push");
     return;

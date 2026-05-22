@@ -120,7 +120,7 @@ beforeAll(async () => {
     notify: new NoopChannel(),
   });
 
-  app = await buildServer({ env, log, probot, dedup, queue });
+  app = await buildServer({ env, log, probot, dedup, queue, notify: new NoopChannel() });
 });
 
 afterAll(async () => {

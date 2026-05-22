@@ -40,6 +40,9 @@ function makeQueue(): MultiQueue<CascadeJob> & {
   };
 }
 
+// D-01: notify mock — fresh per test so call-tracking does not leak across cases
+const makeNotify = () => ({ notify: vi.fn().mockResolvedValue(undefined) });
+
 interface PartialPushPayload {
   ref?: string;
   created?: boolean;
@@ -95,32 +98,32 @@ beforeEach(() => {
 describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", () => {
   it("tag push (ref=refs/tags/v1) → not enqueued", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ ref: "refs/tags/v1" }), { queue: q });
+    await handlePushEvent(makeCtx({ ref: "refs/tags/v1" }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
     expect(loadConfigMock).not.toHaveBeenCalled();
   });
 
   it("created=true → not enqueued", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ created: true }), { queue: q });
+    await handlePushEvent(makeCtx({ created: true }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
   });
 
   it("deleted=true → not enqueued", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ deleted: true }), { queue: q });
+    await handlePushEvent(makeCtx({ deleted: true }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
   });
 
   it("head_commit=null → not enqueued", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ head_commit: null }), { queue: q });
+    await handlePushEvent(makeCtx({ head_commit: null }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
   });
 
   it("installation missing → not enqueued", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ installation: null }), { queue: q });
+    await handlePushEvent(makeCtx({ installation: null }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
   });
 
@@ -130,21 +133,24 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
       errors: [{ line: 1, col: 1, message: "bad" }],
     });
     const warnSpy = vi.spyOn(log, "warn");
-    await handlePushEvent(makeCtx({}), { queue: q });
+    await handlePushEvent(makeCtx({}), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
     expect(warnSpy).toHaveBeenCalled();
   });
 
   it("branch is dev_branch → not enqueued (silent, no log)", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ ref: "refs/heads/dev" }), { queue: q });
+    await handlePushEvent(makeCtx({ ref: "refs/heads/dev" }), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
   });
 
   it("loop prevention: sender=bot → not enqueued + log with reasons", async () => {
     const q = makeQueue();
     const infoSpy = vi.spyOn(log, "info");
-    await handlePushEvent(makeCtx({ sender: { login: "my-app[bot]" } }), { queue: q });
+    await handlePushEvent(makeCtx({ sender: { login: "my-app[bot]" } }), {
+      queue: q,
+      notify: makeNotify(),
+    });
     expect(q.calls).toHaveLength(0);
     const events = infoSpy.mock.calls.map((c: unknown[]) => (c[0] as { event?: string })?.event);
     expect(events).toContain("cascade_skipped_loop_prevention");
@@ -154,7 +160,7 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
     const q = makeQueue();
     sourceShaDedupSeenMock.mockReturnValueOnce(true);
     const infoSpy = vi.spyOn(log, "info");
-    await handlePushEvent(makeCtx({}), { queue: q });
+    await handlePushEvent(makeCtx({}), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(0);
     const events = infoSpy.mock.calls.map((c: unknown[]) => (c[0] as { event?: string })?.event);
     expect(events).toContain("cascade_skipped_dedup");
@@ -162,7 +168,7 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
 
   it("happy path: push to main → enqueued with full PushJob payload + mark dedup", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({}, "deliv-happy"), { queue: q });
+    await handlePushEvent(makeCtx({}, "deliv-happy"), { queue: q, notify: makeNotify() });
     expect(q.calls).toHaveLength(1);
     const entry = q.calls[0]!;
     expect(entry.id).toBe("deliv-happy");
@@ -186,8 +192,19 @@ describe("handlePushEvent (D-02 filters + D-17 loop prevention + D-18 dedup)", (
 
   it("happy path: push to release_branch → enqueued with branch=release", async () => {
     const q = makeQueue();
-    await handlePushEvent(makeCtx({ ref: "refs/heads/release" }, "deliv-release"), { queue: q });
+    await handlePushEvent(makeCtx({ ref: "refs/heads/release" }, "deliv-release"), {
+      queue: q,
+      notify: makeNotify(),
+    });
     expect(q.calls).toHaveLength(1);
     expect(q.calls[0]!.payload.branch).toBe("release");
+  });
+
+  it("propagates deps.notify into loadConfig (D-01)", async () => {
+    const q = makeQueue();
+    const notifyMock = makeNotify();
+    await handlePushEvent(makeCtx({}), { queue: q, notify: notifyMock });
+    expect(loadConfigMock).toHaveBeenCalledTimes(1);
+    expect(loadConfigMock.mock.calls[0]![0]!.notify).toBe(notifyMock);
   });
 });
