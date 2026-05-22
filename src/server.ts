@@ -14,8 +14,8 @@ import { registerPushHandler } from "./webhook/pushHandler.js";
 export interface BuildServerDeps {
   env: Env;
   log: pino.Logger;
-  // Optional: wired by index.ts after probot.ready(); absence → 503 "readyz-not-wired"
-  readyzFn?: () => Promise<{ ok: boolean; reason?: string }>;
+  // Wired post-ready; absence → 503 "readyz-not-wired". body merged into /readyz JSON (notify_status injection).
+  readyzFn?: () => Promise<{ ok: boolean; reason?: string; body?: Record<string, unknown> }>;
   // Optional: registered once probot is ready
   probot?: Probot;
   dedup?: { seen(id: string): boolean; mark(id: string): void };
@@ -52,10 +52,12 @@ export async function buildServer(deps: BuildServerDeps) {
     const result = await deps.readyzFn();
 
     if (!result.ok) {
-      return reply.code(503).send({ status: "not-ready", reason: result.reason });
+      return reply
+        .code(503)
+        .send({ status: "not-ready", reason: result.reason, ...result.body });
     }
 
-    return { status: "ready" };
+    return { status: "ready", ...result.body };
   });
 
   if (deps.probot && deps.dedup && deps.queue && deps.notify) {
