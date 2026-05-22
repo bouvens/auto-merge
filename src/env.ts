@@ -13,7 +13,16 @@ const Base = z.object({
   CRON_SCHEDULE: z.string().default("*/10 * * * *"),
   CRON_TZ: z.string().default("UTC"),
   SLACK_WEBHOOK_URL: z.url().optional(),
-  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  // D-02: min(40) catches truncated/empty tokens without locking to provider-specific regex.
+  TELEGRAM_BOT_TOKEN: z.string().min(40).optional(),
+  // D-04: v1.1 env vars staged together so Phases 7-10 consume them as already-validated.
+  NOTIFY_HEALTHCHECK_REQUIRED: z.coerce.boolean().default(false),
+  NOTIFY_HEALTHCHECK_TTL_MS: z.coerce.number().int().positive().default(900_000),
+  SETUP_ENABLED: z.coerce.boolean().default(false),
+  SETUP_PUBLIC_URL: z.url().optional(),
+  DEFAULT_CASCADE_CONFIG_FILE: z.string().optional(),
+  DEFAULT_CASCADE_CONFIG_YAML: z.string().optional(),
+  DIAGNOSE_TOKEN: z.string().min(16).optional(),
   NOTIFY_DEDUP_TTL_MS: z.coerce.number().int().positive().default(3_600_000),
   NOTIFY_DEDUP_MAX: z.coerce.number().int().positive().default(1000),
   NOTIFY_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
@@ -27,13 +36,20 @@ const KeyFields = z.object({
   PRIVATE_KEY_PATH: z.string().min(1).optional(),
 });
 
-const EnvSchema = Base.extend(KeyFields.shape).refine(
-  (e) => (e.PRIVATE_KEY ? 1 : 0) + (e.PRIVATE_KEY_PATH ? 1 : 0) === 1,
-  {
+const EnvSchema = Base.extend(KeyFields.shape)
+  .refine((e) => (e.PRIVATE_KEY ? 1 : 0) + (e.PRIVATE_KEY_PATH ? 1 : 0) === 1, {
     message: "Exactly one of PRIVATE_KEY or PRIVATE_KEY_PATH must be set",
     path: ["PRIVATE_KEY"],
-  },
-);
+  })
+  .superRefine((e, ctx) => {
+    if (e.SETUP_ENABLED && !e.SETUP_PUBLIC_URL) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["SETUP_PUBLIC_URL"],
+        message: "SETUP_PUBLIC_URL is required when SETUP_ENABLED=true",
+      });
+    }
+  });
 
 // PRIVATE_KEY is always a resolved string after loadEnv, regardless of which source was used.
 export type Env = Omit<z.infer<typeof EnvSchema>, "PRIVATE_KEY" | "PRIVATE_KEY_PATH"> & {

@@ -10,6 +10,9 @@ import type { Config } from "../../src/config/schema.js";
 // Stub env — no real process.env reads.
 const stubEnv = {
   NOTIFY_DEDUP_TTL_MS: 3_600_000,
+  NOTIFY_HEALTHCHECK_REQUIRED: false,
+  NOTIFY_HEALTHCHECK_TTL_MS: 900_000,
+  SETUP_ENABLED: false,
   NOTIFY_DEDUP_MAX: 1000,
   NOTIFY_TIMEOUT_MS: 5000,
   NOTIFY_RETRY_ATTEMPTS: 3,
