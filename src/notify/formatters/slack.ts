@@ -11,14 +11,14 @@ const formatters: { [K in NotifyEvent["kind"]]: (e: Extract<NotifyEvent, { kind:
     `Repo: \`${escapeHtml(e.repo)}\` | \`${escapeHtml(e.src)}\` → \`${escapeHtml(e.tgt)}\`\n` +
     `Author: @${escapeHtml(e.author_login ?? "unknown")}\n` +
     `<${e.pr_url}|PR created>\n` +
-    `Run: \`${escapeHtml(e.run_id.slice(0, 8))}\``,
+    `Run: ${e.check_run_html_url ? `<${e.check_run_html_url}|${escapeHtml(e.run_id.slice(0, 8))}>` : `\`${escapeHtml(e.run_id.slice(0, 8))}\``}`,
 
   protection_blocked: (e) =>
     `*Protection blocked* — rule \`${escapeHtml(e.rule)}\`\n` +
     `Repo: \`${escapeHtml(e.repo)}\` | \`${escapeHtml(e.src)}\` → \`${escapeHtml(e.tgt)}\`\n` +
     `Author: @${escapeHtml(e.author_login ?? "unknown")}\n` +
     `<${e.pr_url}|View PR>\n` +
-    `Run: \`${escapeHtml(e.run_id.slice(0, 8))}\``,
+    `Run: ${e.check_run_html_url ? `<${e.check_run_html_url}|${escapeHtml(e.run_id.slice(0, 8))}>` : `\`${escapeHtml(e.run_id.slice(0, 8))}\``}`,
 
   permission_error: (e) =>
     `*Permission error* — missing \`${escapeHtml(e.missing_permission)}\`\n` +

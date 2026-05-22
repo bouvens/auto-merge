@@ -208,6 +208,8 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
             src,
             tgt,
             pr_url: prResult.ok ? prResult.pr_url : "",
+            ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+            ...(result.check_run_html_url ? { check_run_html_url: result.check_run_html_url } : {}),
           });
           break;
         }
@@ -230,12 +232,14 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
 
           // When mergeStep skipped the in_progress Check Run (protection blocked before it was created), create one now for the failure record.
           let checkRunId = result.check_run_id;
+          let checkRunHtmlUrl = result.check_run_html_url;
           if (checkRunId === null) {
             const cr = await createInProgress(
               { octokit, owner, repo },
               { source_sha: after, src, tgt, runId },
             );
             checkRunId = cr?.check_run_id ?? null;
+            checkRunHtmlUrl = cr?.html_url ?? null;
           }
           if (checkRunId !== null) {
             await completeFailure(
@@ -259,6 +263,8 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
             tgt,
             pr_url,
             rule: result.rule,
+            ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+            ...(checkRunHtmlUrl ? { check_run_html_url: checkRunHtmlUrl } : {}),
           });
           break;
         }
