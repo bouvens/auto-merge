@@ -14,6 +14,10 @@ const Base = z.object({
   CRON_TZ: z.string().default("UTC"),
   SLACK_WEBHOOK_URL: z.url().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  NOTIFY_DEDUP_TTL_MS: z.coerce.number().int().positive().default(3_600_000),
+  NOTIFY_DEDUP_MAX: z.coerce.number().int().positive().default(1000),
+  NOTIFY_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  NOTIFY_RETRY_ATTEMPTS: z.coerce.number().int().positive().default(3),
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
 });
 

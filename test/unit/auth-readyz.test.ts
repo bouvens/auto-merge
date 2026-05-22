@@ -38,6 +38,10 @@ function makeEnv(overrides: Partial<{ PRIVATE_KEY: string }> = {}) {
     WEBHOOK_QUEUE_PER_KEY_MAX: 16,
     CRON_SCHEDULE: "*/10 * * * *",
     CRON_TZ: "UTC",
+    NOTIFY_DEDUP_TTL_MS: 3_600_000,
+    NOTIFY_DEDUP_MAX: 1000,
+    NOTIFY_TIMEOUT_MS: 5000,
+    NOTIFY_RETRY_ATTEMPTS: 3,
     NODE_ENV: "test" as const,
     ...overrides,
   };

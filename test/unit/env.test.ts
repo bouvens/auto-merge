@@ -211,4 +211,86 @@ describe("loadEnv", () => {
       expect(env.CRON_TZ).toBe("America/New_York");
     });
   });
+
+  describe("Phase 4 notify env fields (D-22)", () => {
+    it("applies defaults: NOTIFY_DEDUP_TTL_MS=3600000, NOTIFY_DEDUP_MAX=1000, NOTIFY_TIMEOUT_MS=5000, NOTIFY_RETRY_ATTEMPTS=3", async () => {
+      setValidInlineEnv();
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.NOTIFY_DEDUP_TTL_MS).toBe(3_600_000);
+      expect(env.NOTIFY_DEDUP_MAX).toBe(1000);
+      expect(env.NOTIFY_TIMEOUT_MS).toBe(5000);
+      expect(env.NOTIFY_RETRY_ATTEMPTS).toBe(3);
+    });
+
+    it("coerces NOTIFY_DEDUP_TTL_MS string to number", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_TTL_MS: "60000" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.NOTIFY_DEDUP_TTL_MS).toBe(60000);
+    });
+
+    it("rejects NOTIFY_DEDUP_TTL_MS=0 (must be positive)", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_TTL_MS: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects NOTIFY_DEDUP_TTL_MS=-1 (must be positive)", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_TTL_MS: "-1" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects NOTIFY_DEDUP_TTL_MS='abc' (non-numeric)", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_TTL_MS: "abc" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects NOTIFY_DEDUP_MAX=0 (must be positive)", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_MAX: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("accepts custom NOTIFY_DEDUP_MAX", async () => {
+      setValidInlineEnv({ NOTIFY_DEDUP_MAX: "500" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.NOTIFY_DEDUP_MAX).toBe(500);
+    });
+
+    it("rejects NOTIFY_TIMEOUT_MS=0 (must be positive)", async () => {
+      setValidInlineEnv({ NOTIFY_TIMEOUT_MS: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("accepts custom NOTIFY_TIMEOUT_MS", async () => {
+      setValidInlineEnv({ NOTIFY_TIMEOUT_MS: "10000" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.NOTIFY_TIMEOUT_MS).toBe(10000);
+    });
+
+    it("rejects NOTIFY_RETRY_ATTEMPTS=0 (must be positive)", async () => {
+      setValidInlineEnv({ NOTIFY_RETRY_ATTEMPTS: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("accepts custom NOTIFY_RETRY_ATTEMPTS", async () => {
+      setValidInlineEnv({ NOTIFY_RETRY_ATTEMPTS: "5" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.NOTIFY_RETRY_ATTEMPTS).toBe(5);
+    });
+  });
 });
