@@ -49,7 +49,7 @@ export async function handlePushEvent(ctx: PushContext, deps: PushHandlerDeps): 
   const repo = payload.repository.name;
   const after = payload.after;
 
-  const { config, errors } = await loadConfig({ octokit: ctx.octokit, owner, repo, sha: after });
+  const { config, errors } = await loadConfig({ octokit: ctx.octokit, owner, repo, sha: after, installation_id: payload.installation.id });
   if (errors.length > 0 || !config) {
     log.warn({ delivery_id, owner, repo, event: "push_config_invalid" }, "push");
     return;

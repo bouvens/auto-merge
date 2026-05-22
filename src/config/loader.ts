@@ -2,6 +2,7 @@ import type { Octokit } from "@octokit/core";
 import { LRUCache } from "lru-cache";
 import { LineCounter, parseDocument } from "yaml";
 import { createFailureCheckRun } from "../cascade/checkRun.js";
+import type { NotificationChannel } from "../notify/channel.js";
 import { type Config, ConfigSchema } from "./schema.js";
 
 export interface ConfigError {
@@ -16,6 +17,13 @@ const cache = new LRUCache<string, Config>({
   ttl: 3_600_000,
   ttlAutopurge: true,
 });
+
+// Last-known config per repo — stale-ok for notification channel getConfig lookups (D-16 option A).
+const repoConfigCache = new Map<string, Config>();
+
+export function getRepoConfig(owner: string, repo: string): Config | undefined {
+  return repoConfigCache.get(`${owner}/${repo}`);
+}
 
 export function parseConfig(text: string): { config?: Config; errors: ConfigError[] } {
   const lineCounter = new LineCounter();
@@ -50,6 +58,8 @@ export async function loadConfig(deps: {
   owner: string;
   repo: string;
   sha: string;
+  installation_id: number;
+  notify?: NotificationChannel;
 }): Promise<{ config?: Config; errors: ConfigError[] }> {
   const key = `${deps.owner}/${deps.repo}@${deps.sha}`;
   const cached = cache.get(key);
@@ -72,6 +82,13 @@ export async function loadConfig(deps: {
         { line: 1, col: 1, message: "config file not found or not a file" },
       ];
       await createInvalidConfigCheckRun(deps, errors);
+      void deps.notify?.notify({
+        kind: "config_invalid",
+        installation_id: deps.installation_id,
+        repo: `${deps.owner}/${deps.repo}`,
+        config_path: ".github/auto-merge.yml",
+        zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+      }).catch(() => undefined);
       return { errors };
     }
     // GitHub encodes file content as base64 with embedded newlines — strip before decoding.
@@ -82,16 +99,31 @@ export async function loadConfig(deps: {
       { line: 1, col: 1, message: `failed to fetch config: ${message}` },
     ];
     await createInvalidConfigCheckRun(deps, errors);
+    void deps.notify?.notify({
+      kind: "config_invalid",
+      installation_id: deps.installation_id,
+      repo: `${deps.owner}/${deps.repo}`,
+      config_path: ".github/auto-merge.yml",
+      zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+    }).catch(() => undefined);
     return { errors };
   }
 
   const result = parseConfig(text);
   if (result.errors.length > 0) {
     await createInvalidConfigCheckRun(deps, result.errors);
+    void deps.notify?.notify({
+      kind: "config_invalid",
+      installation_id: deps.installation_id,
+      repo: `${deps.owner}/${deps.repo}`,
+      config_path: ".github/auto-merge.yml",
+      zod_error: result.errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+    }).catch(() => undefined);
     return result;
   }
 
   cache.set(key, result.config!);
+  repoConfigCache.set(`${deps.owner}/${deps.repo}`, result.config!);
   return result;
 }
 

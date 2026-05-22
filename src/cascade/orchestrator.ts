@@ -48,6 +48,7 @@ async function resolveJobContext(
   job: Job<CascadeJob>,
   octokit: Awaited<ReturnType<typeof getInstallationOctokit>>,
   baseLog: Record<string, unknown>,
+  notify: NotificationChannel,
 ): Promise<ResolvedJobContext | null> {
   const payload = job.payload;
 
@@ -65,7 +66,7 @@ async function resolveJobContext(
   }
 
   const { owner, repo } = payload;
-  const { config } = await loadConfig({ octokit, owner, repo, sha: "HEAD" });
+  const { config } = await loadConfig({ octokit, owner, repo, sha: "HEAD", installation_id: payload.installation_id, notify });
   if (!config) {
     log.warn({ ...baseLog, event: "cascade_failed_config_invalid" }, "cascade");
     return null;
@@ -122,7 +123,7 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
     try {
       const octokit = await getInstallationOctokit(installation_id);
 
-      const ctx = await resolveJobContext(job, octokit, baseLog);
+      const ctx = await resolveJobContext(job, octokit, baseLog, notify);
       if (!ctx) return;
 
       const { after, config, branch, headCommitAuthor, senderLogin } = ctx;
@@ -201,6 +202,7 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
           );
           await notify.notify({
             kind: "cascade_conflict",
+            installation_id,
             run_id: runId,
             repo: `${owner}/${repo}`,
             src,
@@ -250,6 +252,7 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
           }
           await notify.notify({
             kind: "protection_blocked",
+            installation_id,
             run_id: runId,
             repo: `${owner}/${repo}`,
             src,
@@ -288,6 +291,7 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
           );
           await notify.notify({
             kind: "permission_error",
+            installation_id,
             run_id: runId,
             repo: `${owner}/${repo}`,
             src,

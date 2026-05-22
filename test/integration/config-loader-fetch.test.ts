@@ -39,7 +39,7 @@ afterAll(() => server.close());
 
 describe("loadConfig — GitHub Contents API fetch", () => {
   it("fetches and parses a valid config", async () => {
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-fetch-01" });
+    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-fetch-01", installation_id: 0 });
     expect(result.errors).toHaveLength(0);
     expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
     expect(callCounts["sha-fetch-01"]).toBe(1);
@@ -49,16 +49,16 @@ describe("loadConfig — GitHub Contents API fetch", () => {
     // Use a unique SHA to avoid cross-test cache contamination.
     const sha = "sha-cache-test-01";
     // First call populates cache.
-    await loadConfig({ octokit, owner: "o", repo: "r", sha });
+    await loadConfig({ octokit, owner: "o", repo: "r", sha, installation_id: 0 });
     // Second call must hit cache — no additional API request.
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha });
+    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha, installation_id: 0 });
     expect(result.errors).toHaveLength(0);
     expect(callCounts[sha]).toBe(1);
   });
 
   it("makes a new API call for a different sha (cache miss)", async () => {
     const sha = "sha-cache-miss-01";
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha });
+    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha, installation_id: 0 });
     expect(result.errors).toHaveLength(0);
     expect(callCounts[sha]).toBe(1);
   });
