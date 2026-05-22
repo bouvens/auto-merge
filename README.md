@@ -1,41 +1,45 @@
 # auto-merge
 
-Self-hostable GitHub App for automatic cascade merging: `main → release → dev` (or `main → dev` when no release branch exists).
+## What & Why
 
-Replaces PAT-based scripts with a GitHub App using minimal permissions, an audit trail via Check Runs and merge commits, and conflict notifications via Slack/Telegram.
+Engineering teams that maintain a long-lived branch cascade (`main → release → dev`) spend
+time manually merging upstream changes downstream after every release commit. The typical
+workaround — a shell script authenticated with a Personal Access Token — accumulates
+unrotated tokens in repository secrets, carries broader permissions than needed, and leaves
+no audit trail when a merge fires.
 
-## Status
+auto-merge replaces that script with a self-hosted GitHub App. The App uses an installation
+token minted on demand (short-lived, scoped to the target repos), records every action as a
+merge commit, Check Run, or Pull Request, and notifies your team via Slack or Telegram the
+moment a conflict blocks the cascade. All you need is a VPS or k8s pod running one Docker
+container.
 
-Phase 1 (Foundation) — webhook receiver + health endpoints operational. Cascade merge engine is not yet implemented (Phase 2+).
+## Quickstart
 
-## Prerequisites
+```bash
+docker run -d \
+  -e APP_ID=123456 \
+  -e PRIVATE_KEY="$(cat ./private-key.pem)" \
+  -e WEBHOOK_SECRET=$(openssl rand -hex 32) \
+  -p 3000:3000 \
+  ghcr.io/bouvens/auto-merge:1.0
+```
 
-- Node.js 22+ for local development
-- Docker for self-hosting
-- A registered GitHub App (see [GitHub App Setup](#github-app-setup) below)
+For production use the file-mount approach (see [GitHub App Setup](#github-app-setup)):
 
-## GitHub App Setup
+```bash
+docker run -d \
+  -e APP_ID=123456 \
+  -e WEBHOOK_SECRET=$(openssl rand -hex 32) \
+  -e PRIVATE_KEY_PATH=/run/secrets/app-key.pem \
+  -v /path/to/app-key.pem:/run/secrets/app-key.pem:ro \
+  -p 3000:3000 \
+  --stop-timeout=60 \
+  ghcr.io/bouvens/auto-merge:1.0
+```
 
-Create a GitHub App at `https://github.com/settings/apps/new` (personal) or `https://github.com/organizations/<org>/settings/apps/new` (org).
-
-**Required permissions (minimum):**
-
-| Permission | Level | Why |
-|---|---|---|
-| Contents | Read & write | Create merge commits on cascade branches |
-| Pull requests | Read & write | Open PRs when a merge conflict is detected |
-| Checks | Read & write | Post Check Runs for config validation and cascade status |
-| Metadata | Read | Read repository metadata (required by GitHub) |
-
-**Events to subscribe (Phase 1+):** `ping`, `installation`, `installation_repositories`, `installation_target`
-
-**Events needed for future phases:** `push`, `repository_dispatch` (subscribe now to avoid re-registering later)
-
-**Webhook URL:** `https://<your-host>/webhook`
-
-**Webhook secret:** Generate with `openssl rand -hex 32`. Save the value — you will pass it as `WEBHOOK_SECRET`.
-
-**Private key:** In the App settings page, generate a private key and download the `.pem` file.
+`--stop-timeout=60` gives the container enough time to drain in-flight cascades on SIGTERM
+before Docker sends SIGKILL (see [Graceful Shutdown](#graceful-shutdown)).
 
 ## Environment Variables
 
@@ -43,10 +47,10 @@ Create a GitHub App at `https://github.com/settings/apps/new` (personal) or `htt
 
 | Variable | Description |
 |---|---|
-| `APP_ID` | GitHub App ID (integer shown in App settings → About) |
-| `WEBHOOK_SECRET` | Webhook secret you set during App creation (min 16 chars) |
+| `APP_ID` | GitHub App ID (integer shown in App settings under "About") |
+| `WEBHOOK_SECRET` | Webhook secret set during App creation (minimum 16 characters) |
 | `PRIVATE_KEY_PATH` | Path to the mounted `.pem` private key file **(recommended for production)** |
-| `PRIVATE_KEY` | Inline PEM string with literal `\n` newlines **(alternative for quick-start)** |
+| `PRIVATE_KEY` | Inline PEM string with literal `\n` newlines **(alternative, useful in CI)** |
 
 Exactly one of `PRIVATE_KEY_PATH` or `PRIVATE_KEY` must be provided.
 
@@ -56,136 +60,110 @@ Exactly one of `PRIVATE_KEY_PATH` or `PRIVATE_KEY` must be provided.
 |---|---|---|
 | `PORT` | `3000` | HTTP listen port |
 | `LOG_LEVEL` | `info` | `trace` \| `debug` \| `info` \| `warn` \| `error` \| `fatal` |
-| `WEBHOOK_QUEUE_MAX` | `1000` | Max in-flight webhook jobs before oldest is dropped |
-| `SHUTDOWN_TIMEOUT` | `30000` | Milliseconds to wait for in-flight jobs on SIGTERM |
+| `WEBHOOK_QUEUE_MAX` | `1000` | Global cap on in-flight webhook jobs (drop-oldest beyond this) |
+| `WEBHOOK_QUEUE_PER_KEY_MAX` | `16` | Per-repo queue cap (drop-oldest beyond this) |
+| `SHUTDOWN_TIMEOUT` | `30000` | Milliseconds to wait for in-flight cascades on SIGTERM |
+| `CRON_SCHEDULE` | `*/10 * * * *` | Cron expression for the safety-net sweep; set to empty string to disable |
+| `CRON_TZ` | `UTC` | Timezone for cron expression evaluation |
+| `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL for conflict and error notifications |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram bot token for conflict and error notifications |
+| `NOTIFY_DEDUP_TTL_MS` | `3600000` | Dedup window in milliseconds (default 1 hour) |
+| `NOTIFY_DEDUP_MAX` | `1000` | Maximum dedup cache entries before eviction |
+| `NOTIFY_TIMEOUT_MS` | `5000` | Per-attempt timeout for Slack/Telegram HTTP requests |
+| `NOTIFY_RETRY_ATTEMPTS` | `3` | Number of retry attempts before marking a notification as final-fail |
 | `NODE_ENV` | `production` | `development` \| `production` \| `test` |
-| `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL for conflict notifications (Phase 4) |
-| `TELEGRAM_BOT_TOKEN` | — | Telegram bot token for conflict notifications (Phase 4) |
 
-## Quick Start (Docker)
+## GitHub App Setup
 
-### Recommended: private key as a mounted file (production)
+1. Go to **GitHub Settings → Developer settings → GitHub Apps → New GitHub App**
+   (personal: `https://github.com/settings/apps/new`;
+   org: `https://github.com/organizations/<org>/settings/apps/new`).
 
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -e APP_ID=12345 \
-  -e WEBHOOK_SECRET=$(openssl rand -hex 32) \
-  -e PRIVATE_KEY_PATH=/run/secrets/app-key.pem \
-  -v /path/to/app-key.pem:/run/secrets/app-key.pem:ro \
-  --name auto-merge \
-  ghcr.io/<your-org>/auto-merge:latest
-```
+2. Set the **Webhook URL** to `https://<your-host>/webhook`.
 
-### Alternative: inline private key (quick-start / CI)
+3. Set the **Webhook secret** (generate with `openssl rand -hex 32`). Save the value — you
+   will pass it as `WEBHOOK_SECRET`.
 
-```bash
-docker run --rm \
-  -p 3000:3000 \
-  -e APP_ID=12345 \
-  -e WEBHOOK_SECRET=$(openssl rand -hex 32) \
-  -e PRIVATE_KEY="$(cat app-key.pem)" \
-  ghcr.io/<your-org>/auto-merge:latest
-```
+4. Grant the following **Repository permissions** (all others can stay "No access"):
 
-### Build from source
+   | Permission | Level | Why |
+   |---|---|---|
+   | Contents | Read & write | Create merge commits on cascade branches |
+   | Pull requests | Read & write | Open PRs when a merge conflict is detected |
+   | Checks | Read & write | Post Check Runs for config validation and cascade status |
+   | Metadata | Read | Required by GitHub for all Apps |
+   | Administration | Read | Pre-flight check for branch protection rules |
 
-```bash
-docker build -t auto-merge:local .
-docker run --rm -p 3000:3000 \
-  -e APP_ID=12345 \
-  -e WEBHOOK_SECRET=<secret> \
-  -e PRIVATE_KEY_PATH=/run/secrets/app-key.pem \
-  -v "$PWD/app-key.pem:/run/secrets/app-key.pem:ro" \
-  auto-merge:local
-```
+5. Under **Subscribe to events**, enable: **Push**, **Repository dispatch**.
 
-## Health Endpoints
+6. Click **Create GitHub App**. On the App settings page click **Generate a private key**,
+   download the `.pem` file. Save the **App ID** shown in "About".
 
-| Endpoint | Type | Returns |
-|---|---|---|
-| `GET /healthz` | Liveness | `{"status":"ok"}` — 200 while the event loop is alive |
-| `GET /readyz` | Readiness | `{"status":"ready"}` — 200 when the GitHub App JWT can be minted from the private key |
+7. In the left sidebar click **Install App** and install it on the repositories the App
+   should manage.
 
-## Local Development
+## Slack Setup
 
-```bash
-npm install
-cp .env.example .env   # populate APP_ID, WEBHOOK_SECRET, PRIVATE_KEY_PATH
-node --env-file=.env --import tsx src/index.ts
-# or
-npm run dev
-```
+1. Go to `https://api.slack.com/apps` and click **Create New App → From scratch**.
+2. Under **Features → Incoming Webhooks**, toggle it on and click **Add New Webhook to Workspace**.
+3. Select the channel where notifications should be posted and click **Allow**.
+4. Copy the webhook URL (looks like `https://hooks.slack.com/services/T.../B.../...`).
+5. Set `SLACK_WEBHOOK_URL=<url>` in your container environment.
 
-**Webhook tunneling with smee.io (dev only):**
-
-```bash
-npx smee-client --url https://smee.io/<your-channel> --target http://localhost:3000/webhook
-```
-
-Set the smee.io URL as the Webhook URL in your GitHub App settings.
-
-## Scripts
-
-| Script | Command | Purpose |
-|---|---|---|
-| `build` | `tsc --project tsconfig.build.json` | Compile TypeScript to `dist/` |
-| `dev` | `tsx watch src/index.ts` | Dev server with hot-reload |
-| `start` | `node --enable-source-maps dist/index.js` | Run compiled output |
-| `test` | `vitest run` | Run tests once |
-| `test:watch` | `vitest` | Run tests in watch mode |
-| `lint:fix` | `biome check --write .` | Lint and auto-format |
-| `typecheck` | `tsc --noEmit` | Type-check without emitting |
-
-## What Is Not in Phase 1
-
-The following features land in later phases:
-
-- **Phase 2:** Cascade merge engine (`main → release → dev`)
-- **Phase 3:** Per-repository lock manager and cron safety-net
-- **Phase 4:** Slack and Telegram conflict notifications
-
-## Graceful Shutdown
-
-On `SIGTERM` or `SIGINT` the App executes this shutdown sequence:
-
-| Step | Action | Budget |
-|---|---|---|
-| 1 | Stop the cron scheduler (waits for any running tick to finish) | ≤ 5 s |
-| 2 | Stop accepting new HTTP requests (Fastify close) | ≈ instant |
-| 3 | Drain per-repo queues — wait for in-flight cascades to finish | ≤ `SHUTDOWN_TIMEOUT` (default 30 s) |
-| 4 | `exit 0` | — |
-
-Total time before the process exits: **≤ `SHUTDOWN_TIMEOUT` + 5 s** (≤ 35 s with defaults).
-
-**Drain timeout is not an error.** If in-flight cascades are still running when the timeout expires, the App logs `multi_queue_drain_timeout` and exits 0. The next cron tick (default every 10 min) picks up any missed work via the safety-net sweep.
-
-**SIGKILL cannot be caught.** A hard kill drops all in-flight cascades immediately. This is a documented limitation; the next cron tick recovers missed work, but any cascade interrupted mid-merge stays where the GitHub server left it (server-side merge is atomic — the commit either landed or it didn't).
-
-### Container Grace Period
-
-The container runtime must wait long enough for the shutdown sequence to complete before sending SIGKILL.
-
-**Docker:**
-
-```bash
-docker run --stop-timeout=60 ...
-```
-
-The default `--stop-timeout` is 10 s, which is shorter than the 35 s budget above. Without this flag Docker sends SIGKILL before the queue drains.
-
-**Kubernetes:**
+To send notifications to a different channel per repository, override it in
+`.github/auto-merge.yml` (see [Per-Repo Config](#per-repo-config)):
 
 ```yaml
-spec:
-  terminationGracePeriodSeconds: 60   # must exceed SHUTDOWN_TIMEOUT + 5s
+notifications:
+  slack:
+    channel: "#team-alerts"
 ```
 
-The default `terminationGracePeriodSeconds` is 30 s, which equals `SHUTDOWN_TIMEOUT` but leaves no room for the cron stop budget. Set it to at least `SHUTDOWN_TIMEOUT + 10` to be safe.
+## Telegram Setup
+
+1. DM **@BotFather** on Telegram and send `/newbot`. Follow the prompts.
+2. Copy the bot token (format: `1234567890:ABCDEF...`).
+3. Set `TELEGRAM_BOT_TOKEN=<token>` in your container environment.
+4. To get your `chat_id`: add the bot to a group (or use it in a direct chat), send any
+   message, then call `https://api.telegram.org/bot<token>/getUpdates` — the `chat.id`
+   field is the value you need. Alternatively, DM **@userinfobot** from that chat.
+
+To send notifications to a different chat per repository, override it in
+`.github/auto-merge.yml`:
+
+```yaml
+notifications:
+  telegram:
+    chat_id: "-1001234567890"
+```
+
+## Per-Repo Config
+
+Each repository managed by auto-merge must have a `.github/auto-merge.yml` file:
+
+```yaml
+main_branch: main
+release_branch: release   # optional — omit for a two-branch main -> dev cascade
+dev_branch: dev
+notifications:
+  slack:
+    channel: "#auto-merge-ops"   # overrides SLACK_WEBHOOK_URL target channel
+  telegram:
+    chat_id: "-1001234567890"    # overrides TELEGRAM_BOT_TOKEN target chat
+```
+
+The `notifications` block is optional. When absent, notifications are sent to the default
+channel/chat configured via env vars. When present, the `channel` / `chat_id` values
+override the default destination for that repository only.
+
+The file is validated against a strict schema on every push. An invalid config produces a
+`failure` Check Run on the `push` event and (if notify is configured) triggers a
+`config_invalid` notification.
 
 ## Manual Trigger via workflow_dispatch
 
-Use this when webhooks are delayed or you want to force a cascade on the current `main` HEAD without pushing a new commit.
+Use this when webhooks are delayed or you want to force a cascade on the current `main` HEAD
+without pushing a new commit.
 
 Commit the following workflow to each repository managed by auto-merge:
 
@@ -208,10 +186,99 @@ jobs:
             -F event_type=auto-merge
 ```
 
-**Notes:**
+Notes:
 
-- No PAT required. The built-in `GITHUB_TOKEN` with `permissions: contents: write` is sufficient to call `POST /repos/{owner}/{repo}/dispatches`.
-- The App always resolves the cascade source from `config.main_branch` HEAD at the time the event is processed. The `client_payload` field is logged for audit but does not influence routing.
-- You may pass additional context via `-F 'client_payload[note]=manual run'`; it appears in structured logs but is otherwise ignored.
-- **GitHub App settings:** ensure `repository_dispatch` is checked under "Subscribe to events" in your App's configuration. Without this subscription the App will not receive the webhook.
-- To avoid a cascade loop, do not wire both `on: push` and the `gh api dispatches` call in the same workflow triggered by a push to `main`. The App itself never calls `POST /dispatches`, so there is no recursion from its side.
+- No PAT required. The built-in `GITHUB_TOKEN` with `permissions: contents: write` is
+  sufficient to call `POST /repos/{owner}/{repo}/dispatches`.
+- The App resolves the cascade source from `config.main_branch` HEAD at the time the event
+  is processed. The `client_payload` field is logged for audit but does not influence routing.
+- You may pass additional context via `-F 'client_payload[note]=manual run'`; it appears in
+  structured logs but is otherwise ignored.
+- Ensure `repository_dispatch` is checked under "Subscribe to events" in the GitHub App
+  settings.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `notify_delivery_failed channel=slack final_status=404` | Slack channel not found | Check `notifications.slack.channel` in `.github/auto-merge.yml` matches a real channel name or ID in the workspace. |
+| `notify_delivery_failed channel=telegram final_status=400 description=chat not found` | Wrong Telegram `chat_id` | Send a message to the bot, call `getUpdates` to see the actual `chat.id`, update `.github/auto-merge.yml`. |
+| Check Run "Invalid .github/auto-merge.yml" | Config file missing required fields | Verify your file matches the example in [Per-Repo Config](#per-repo-config). All three branch fields are required. |
+| Check Run `permission_error: App lacks contents: write` | GitHub App missing permissions | Go to App settings → Permissions & events, grant the missing permission, then re-install the App on the affected repositories. |
+| Container stops before queue drains on deploy | SIGKILL arrives before SIGTERM budget expires | Pass `--stop-timeout=60` to `docker run`, or set `terminationGracePeriodSeconds: 60` in the Kubernetes pod spec. |
+| `/readyz` returns 503 on startup | Private key cannot be parsed | Verify the file at `PRIVATE_KEY_PATH` is the `.pem` downloaded from the GitHub App settings page. Inline `PRIVATE_KEY` must preserve literal `\n` newlines. |
+
+## Health Endpoints
+
+| Endpoint | Type | Returns |
+|---|---|---|
+| `GET /healthz` | Liveness | `{"status":"ok"}` — 200 while the event loop is alive |
+| `GET /readyz` | Readiness | `{"status":"ready"}` — 200 when the GitHub App JWT can be minted from the private key |
+
+## Graceful Shutdown
+
+On `SIGTERM` or `SIGINT` the App executes this shutdown sequence:
+
+| Step | Action | Budget |
+|---|---|---|
+| 1 | Stop the cron scheduler (waits for any running tick to finish) | up to 5 s |
+| 2 | Stop accepting new HTTP requests (Fastify close) | ~instant |
+| 3 | Drain per-repo queues — wait for in-flight cascades to finish | up to `SHUTDOWN_TIMEOUT` (default 30 s) |
+| 4 | `exit 0` | — |
+
+Total time before the process exits: **up to `SHUTDOWN_TIMEOUT` + 5 s** (up to 35 s with defaults).
+
+If in-flight cascades are still running when the timeout expires, the App logs
+`multi_queue_drain_timeout` and exits 0. The next cron tick picks up any missed work.
+
+**SIGKILL cannot be caught.** A hard kill drops all in-flight cascades immediately. The next
+cron tick recovers missed work. Server-side merges are atomic — the commit either landed or
+it did not.
+
+**Container grace period:** set `--stop-timeout=60` (Docker) or
+`terminationGracePeriodSeconds: 60` (Kubernetes) so the runtime waits long enough for the
+shutdown sequence before sending SIGKILL.
+
+## Local Development
+
+```bash
+npm install
+cp .env.example .env   # populate APP_ID, WEBHOOK_SECRET, PRIVATE_KEY_PATH
+node --env-file=.env --import tsx src/index.ts
+# or
+npm run dev
+```
+
+**Webhook tunneling with smee.io (dev only):**
+
+```bash
+npx smee-client --url https://smee.io/<your-channel> --target http://localhost:3000/webhook
+```
+
+Set the smee.io URL as the Webhook URL in your GitHub App settings for local testing.
+
+## Scripts
+
+| Script | Command | Purpose |
+|---|---|---|
+| `build` | `tsc --project tsconfig.build.json` | Compile TypeScript to `dist/` |
+| `dev` | `tsx watch src/index.ts` | Dev server with hot-reload |
+| `start` | `node --enable-source-maps dist/index.js` | Run compiled output |
+| `test` | `vitest run` | Run tests once |
+| `test:watch` | `vitest` | Run tests in watch mode |
+| `lint:fix` | `biome check --write .` | Lint and auto-format |
+| `typecheck` | `tsc --noEmit` | Type-check without emitting |
+
+## Build from Source
+
+```bash
+docker build -t auto-merge:local .
+docker run -d \
+  -e APP_ID=123456 \
+  -e WEBHOOK_SECRET=$(openssl rand -hex 32) \
+  -e PRIVATE_KEY_PATH=/run/secrets/app-key.pem \
+  -v "$PWD/app-key.pem:/run/secrets/app-key.pem:ro" \
+  -p 3000:3000 \
+  --stop-timeout=60 \
+  auto-merge:local
+```

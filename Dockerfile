@@ -1,6 +1,7 @@
 # ---- builder ----
 # Alpine keeps the build image small; all dev deps (tsx, vitest, biome) stay here and never reach runtime.
-FROM node:22-alpine AS builder
+# Pinned by sha256 digest to prevent supply-chain tampering via tag-mutation (T-04-18).
+FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,7 +10,8 @@ COPY src ./src
 RUN npx tsc --project tsconfig.build.json
 
 # ---- runtime ----
-FROM node:22-alpine AS runtime
+# Same digest as builder — both stages must resolve to the same image to prevent inconsistency.
+FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS runtime
 
 # tini is baked into the image rather than relying on `docker run --init` because
 # k8s does not forward the Docker --init flag — without tini, node becomes PID 1
@@ -32,6 +34,8 @@ USER node
 ENV NODE_ENV=production
 EXPOSE 3000
 
+# Busybox wget (bundled in Alpine) is sufficient — no extra apk install needed (T-04-22).
+# Hits localhost only; no external network exposure from the HEALTHCHECK.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/healthz || exit 1
 
