@@ -9,11 +9,7 @@ import {
   initDefaultConfigLoader,
   stopDefaultConfigLoader,
 } from "../../src/config/defaultLoader.js";
-import {
-  getRepoConfig,
-  getRepoConfigSource,
-  loadConfig,
-} from "../../src/config/loader.js";
+import { getRepoConfig, getRepoConfigSource, loadConfig } from "../../src/config/loader.js";
 import { log } from "../../src/log.js";
 
 const VALID_YAML = "main_branch: main\ndev_branch: dev\n";
@@ -53,49 +49,40 @@ afterEach(() => {
 afterAll(() => server.close());
 
 function contentsHandler200(): ReturnType<typeof http.get> {
-  return http.get(
-    "https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml",
-    () => {
-      contentsCallCount++;
-      return HttpResponse.json({
-        content: VALID_YAML_B64,
-        encoding: "base64",
-        type: "file",
-        name: "auto-merge.yml",
-        path: ".github/auto-merge.yml",
-      });
-    },
-  );
+  return http.get("https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml", () => {
+    contentsCallCount++;
+    return HttpResponse.json({
+      content: VALID_YAML_B64,
+      encoding: "base64",
+      type: "file",
+      name: "auto-merge.yml",
+      path: ".github/auto-merge.yml",
+    });
+  });
 }
 
 function contentsHandlerEmpty(): ReturnType<typeof http.get> {
   // Triggers `!data.content` branch — file-missing-branch, not the catch.
-  return http.get(
-    "https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml",
-    () => {
-      contentsCallCount++;
-      return HttpResponse.json({
-        content: "",
-        encoding: "base64",
-        type: "file",
-        name: "auto-merge.yml",
-        path: ".github/auto-merge.yml",
-      });
-    },
-  );
+  return http.get("https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml", () => {
+    contentsCallCount++;
+    return HttpResponse.json({
+      content: "",
+      encoding: "base64",
+      type: "file",
+      name: "auto-merge.yml",
+      path: ".github/auto-merge.yml",
+    });
+  });
 }
 
 function contentsHandlerStatus(status: number): ReturnType<typeof http.get> {
-  return http.get(
-    "https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml",
-    () => {
-      contentsCallCount++;
-      return new HttpResponse(JSON.stringify({ message: "Boom" }), {
-        status,
-        headers: { "content-type": "application/json" },
-      });
-    },
-  );
+  return http.get("https://api.github.com/repos/o/r/contents/.github%2Fauto-merge.yml", () => {
+    contentsCallCount++;
+    return new HttpResponse(JSON.stringify({ message: "Boom" }), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  });
 }
 
 function checkRunHandler(): ReturnType<typeof http.post> {
