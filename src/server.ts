@@ -7,6 +7,8 @@ import { registerDispatchHandler } from "./dispatch/handler.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
 import type { NotificationChannel } from "./notify/channel.js";
+import type { CredentialsStore } from "./setup/credentials.js";
+import { registerSetupRoutes } from "./setup/routes.js";
 import { registerHandlers } from "./webhook/handler.js";
 import type { MultiQueue } from "./webhook/multiQueue.js";
 import { registerPushHandler } from "./webhook/pushHandler.js";
@@ -22,6 +24,8 @@ export interface BuildServerDeps {
   queue?: MultiQueue<CascadeJob>;
   // D-01: clustered with webhook-wiring deps — gated together so push handler always has notify forwarded into loadConfig
   notify?: NotificationChannel;
+  // Required only when env.SETUP_ENABLED — boot wiring (src/index.ts) constructs it inside the same flag-guarded block.
+  credentials?: CredentialsStore;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -104,6 +108,22 @@ export async function buildServer(deps: BuildServerDeps) {
 
       return reply.code(202).send();
     });
+  }
+
+  if (deps.env.SETUP_ENABLED) {
+    if (deps.credentials) {
+      registerSetupRoutes(app, {
+        env: deps.env,
+        log: deps.log,
+        credentials: deps.credentials,
+      });
+    } else {
+      // Defence in depth — boot wiring (src/index.ts) is the source of truth for the flag/store invariant.
+      deps.log.warn(
+        { event: "setup_routes_skipped_missing_credentials" },
+        "setup",
+      );
+    }
   }
 
   return app;
