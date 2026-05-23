@@ -22,6 +22,7 @@ const Base = z.object({
   SETUP_PUBLIC_URL: z.url().optional(),
   DEFAULT_CASCADE_CONFIG_FILE: z.string().optional(),
   DEFAULT_CASCADE_CONFIG_YAML: z.string().optional(),
+  DEFAULT_CONFIG_RELOAD_MS: z.coerce.number().int().positive().default(60_000),
   DIAGNOSE_TOKEN: z.string().min(16).optional(),
   NOTIFY_DEDUP_TTL_MS: z.coerce.number().int().positive().default(3_600_000),
   NOTIFY_DEDUP_MAX: z.coerce.number().int().positive().default(1000),

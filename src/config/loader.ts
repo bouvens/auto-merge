@@ -11,6 +11,8 @@ export interface ConfigError {
   message: string;
 }
 
+export type ConfigSource = "repo" | "file_default" | "env_default";
+
 // Immutable per (owner, repo, sha) — same SHA always yields same content, no invalidation needed (D-16).
 const cache = new LRUCache<string, Config>({
   max: 500,
@@ -20,9 +22,14 @@ const cache = new LRUCache<string, Config>({
 
 // Last-known config per repo — stale-ok for notification channel getConfig lookups (D-16 option A).
 const repoConfigCache = new Map<string, Config>();
+const repoConfigSource = new Map<string, ConfigSource>();
 
 export function getRepoConfig(owner: string, repo: string): Config | undefined {
   return repoConfigCache.get(`${owner}/${repo}`);
+}
+
+export function getRepoConfigSource(owner: string, repo: string): ConfigSource | undefined {
+  return repoConfigSource.get(`${owner}/${repo}`);
 }
 
 export function parseConfig(text: string): { config?: Config; errors: ConfigError[] } {
@@ -60,11 +67,11 @@ export async function loadConfig(deps: {
   sha: string;
   installation_id: number;
   notify?: NotificationChannel;
-}): Promise<{ config?: Config; errors: ConfigError[] }> {
+}): Promise<{ config?: Config; errors: ConfigError[]; source?: ConfigSource }> {
   const key = `${deps.owner}/${deps.repo}@${deps.sha}`;
   const cached = cache.get(key);
   if (cached !== undefined) {
-    return { config: cached, errors: [] };
+    return { config: cached, errors: [], source: "repo" };
   }
 
   let text: string;
@@ -124,7 +131,8 @@ export async function loadConfig(deps: {
 
   cache.set(key, result.config!);
   repoConfigCache.set(`${deps.owner}/${deps.repo}`, result.config!);
-  return result;
+  repoConfigSource.set(`${deps.owner}/${deps.repo}`, "repo");
+  return { ...result, source: "repo" };
 }
 
 // Delegates to shared helper — failure-Check-Run shape is identical across config (CFG-05) and cascade (OBS-01) so we keep one POST path with error swallowing.
