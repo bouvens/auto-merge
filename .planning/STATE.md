@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-23T22:00:00Z"
-last_activity: 2026-05-23 -- Phase 08 plan 04 (manifest form + duplicate guard) complete
+last_updated: "2026-05-23T22:10:00Z"
+last_activity: 2026-05-23 -- Phase 08 plan 05 (manifest callback + download) complete
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 14
-  completed_plans: 9
-  percent: 36
+  completed_plans: 10
+  percent: 40
 ---
 
 # State: auto-merge
@@ -26,9 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 08 (app-manifest-flow) — EXECUTING
-Plan: 5 of 6 (next)
+Plan: 6 of 6 (next — wire-up routes.ts + server.ts integration)
 Status: Executing Phase 08
-Last activity: 2026-05-23 -- 08-04 manifest form + duplicate guard complete (21 tests green)
+Last activity: 2026-05-23 -- 08-05 manifest callback + download routes complete (24 tests green, 516/516 full suite)
 
 ## Last Milestone
 
