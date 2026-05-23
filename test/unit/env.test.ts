@@ -323,4 +323,53 @@ describe("loadEnv", () => {
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
+
+  describe("Phase 8 app-manifest setup env fields (D-01, D-11)", () => {
+    it("applies defaults: SETUP_APP_NAME='auto-merge', SETUP_OUTPUT_DIR='./data'", async () => {
+      setValidInlineEnv();
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.SETUP_APP_NAME).toBe("auto-merge");
+      expect(env.SETUP_OUTPUT_DIR).toBe("./data");
+    });
+
+    it("accepts custom SETUP_APP_NAME and SETUP_OUTPUT_DIR overrides", async () => {
+      setValidInlineEnv({
+        SETUP_APP_NAME: "my-cascade-app",
+        SETUP_OUTPUT_DIR: "/run/secrets",
+      });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.SETUP_APP_NAME).toBe("my-cascade-app");
+      expect(env.SETUP_OUTPUT_DIR).toBe("/run/secrets");
+    });
+
+    it("rejects SETUP_APP_NAME='' (min 1)", async () => {
+      setValidInlineEnv({ SETUP_APP_NAME: "" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects SETUP_APP_NAME of length 35 (max 34)", async () => {
+      setValidInlineEnv({ SETUP_APP_NAME: "a".repeat(35) });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("accepts SETUP_APP_NAME of length 34", async () => {
+      setValidInlineEnv({ SETUP_APP_NAME: "a".repeat(34) });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.SETUP_APP_NAME).toBe("a".repeat(34));
+    });
+
+    it("regression: SETUP_ENABLED=true without SETUP_PUBLIC_URL still fails", async () => {
+      setValidInlineEnv({ SETUP_ENABLED: "true", SETUP_PUBLIC_URL: undefined });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
 });
