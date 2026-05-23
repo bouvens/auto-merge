@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
-status: executing
-last_updated: "2026-05-23T17:12:30Z"
-last_activity: 2026-05-23 -- Phase 08 plan 06 (wiring + e2e) complete — Phase 8 ready for verifier
+status: verifying
+last_updated: "2026-05-24T00:00:00.000Z"
+last_activity: 2026-05-24 -- 09-CONTEXT.md captured (SC2/SC4/SC5 reinterpreted)
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
-  completed_plans: 11
-  percent: 44
+  completed_plans: 14
+  percent: 50
 ---
 
 # State: auto-merge
@@ -25,10 +25,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 ## Current Position
 
-Phase: 08 (app-manifest-flow) — ALL 6 PLANS COMPLETE, ready for verifier
-Plan: 6 of 6 done
-Status: Phase 08 awaiting verification
-Last activity: 2026-05-23 -- 08-06 wiring + e2e complete (6 new tests, 522/522 full suite, tsc clean)
+Phase: 09 (onboarding-webhook-pr-bot) — CONTEXT.md captured, ready for plan-phase
+Plan: 0 of N
+Status: Phase 09 context gathered (SC2/SC4/SC5 reinterpreted)
+Last activity: 2026-05-24 -- 09-CONTEXT.md committed
 
 ## Last Milestone
 
@@ -50,15 +50,15 @@ Last activity: 2026-05-23 -- 08-06 wiring + e2e complete (6 new tests, 522/522 f
 - Onboarding runs **inline в webhook handler**, НЕ в MultiQueue (Anti-Pattern 1 в research/ARCHITECTURE.md).
 - ConfigLoader DEFAULT fallback: memoise на module load, НЕ per-sha LRU; hook sites — loader.ts:80 (file-missing) + loader.ts:96 (404-catch).
 - Manifest credentials persist **до** рендера HTML (Pitfall 2: code single-use + 1h TTL = unrecoverable App).
-- `installation_repositories` batched payload → p-limit(2), cap 20 sync + остаток через MultiQueue low-priority.
+- `installation_repositories` batched payload → p-limit(2) standalone semaphore, всё в одном webhook handler fire-and-forget; **MultiQueue не используется** (Phase 9 reinterpretation of SC2, см. 09-CONTEXT.md <sc_reinterpretations>).
 - Boot notify check: format errors → fail-fast, connectivity errors → degraded mode (Pitfall 11).
 - v1.0 components FROZEN: cascade/, MultiQueue, pushHandler, dispatch, notify dispatcher, cron safetyNet, shutdown, config/schema.ts.
 
 ## Session Continuity
 
-**Last action:** Phase 6 (Foundation: env + notify healthCheck) завершена и верифицирована — `06-VERIFICATION.md` status=passed, 4/4 ROADMAP success criteria + 7/7 locked decisions + 3/3 requirements (DIAG-05/06/07). Test suite 43 файла / 375 тестов.
+**Last action:** Phase 9 CONTEXT.md captured. 4 серые зоны разрешены: overflow (standalone p-limit(2), no MultiQueue), branch-protection fallback (env-level notify, not Issue), installation.deleted cleanup (only MultiQueue.clearByInstallation; LRU stay on TTL), notify suppression (per-installation TTL-Set с DI callback в MultiChannel). SC2/SC4/SC5 переформулированы.
 
-**Next action:** `/gsd:plan-phase 7` — Config DEFAULT fallback (`DEFAULT_CASCADE_CONFIG_FILE` + `DEFAULT_CASCADE_CONFIG_YAML`, precedence repo > file > env, hot-reload для file path; hook sites: loader.ts:80 file-missing + loader.ts:96 404-catch; memoise на module load, НЕ per-sha LRU).
+**Next action:** `/gsd:plan-phase 9 --chain` (continues chain) — research + plan для onboarding webhook + PR-bot, 8 ONBOARD requirements + 5 reinterpreted SC.
 
 ---
 *State initialized: 2026-05-20*
