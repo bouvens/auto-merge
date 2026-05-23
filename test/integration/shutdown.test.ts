@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe("shutdown ordering", () => {
-  it("calls cronHandle.stop → app.close → multiQueue.drain in order", async () => {
+  it("calls cronHandle.stop → defaultLoaderStop → app.close → multiQueue.drain in order", async () => {
     const exitSpy = stubProcessExit();
     const log = makeLog();
     const callOrder: string[] = [];
@@ -51,6 +51,9 @@ describe("shutdown ordering", () => {
         callOrder.push("cron.stop");
       }),
     };
+    const defaultLoaderStop = vi.fn(() => {
+      callOrder.push("defaultLoader.stop");
+    });
     const app = {
       close: vi.fn(async () => {
         callOrder.push("app.close");
@@ -65,12 +68,19 @@ describe("shutdown ordering", () => {
       app: app as never,
       cronHandle,
       multiQueue: queue,
+      defaultLoaderStop,
       log,
       shutdownTimeoutMs: 1000,
     });
 
     await expect(shutdown("SIGTERM")).rejects.toThrow("exit:0");
-    expect(callOrder).toEqual(["cron.stop", "app.close", "queue.drain"]);
+    expect(callOrder).toEqual([
+      "cron.stop",
+      "defaultLoader.stop",
+      "app.close",
+      "queue.drain",
+    ]);
+    expect(defaultLoaderStop).toHaveBeenCalledTimes(1);
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 });
@@ -97,6 +107,7 @@ describe("drain timeout exits 0", () => {
       app: undefined,
       cronHandle: undefined,
       multiQueue: queue,
+      defaultLoaderStop: vi.fn(),
       log,
       shutdownTimeoutMs: 50,
     });
@@ -121,6 +132,7 @@ describe("cron disabled (no-op handle)", () => {
       app: undefined,
       cronHandle,
       multiQueue: queue,
+      defaultLoaderStop: vi.fn(),
       log,
       shutdownTimeoutMs: 100,
     });
@@ -136,12 +148,14 @@ describe("double SIGTERM idempotency", () => {
     const exitSpy = stubProcessExit();
     const log = makeLog();
     const cronHandle = { stop: vi.fn(async () => {}) };
+    const defaultLoaderStop = vi.fn();
     const queue = makeQueue({});
 
     const shutdown = makeShutdown({
       app: undefined,
       cronHandle,
       multiQueue: queue,
+      defaultLoaderStop,
       log,
       shutdownTimeoutMs: 100,
     });
@@ -153,6 +167,7 @@ describe("double SIGTERM idempotency", () => {
     await expect(second).resolves.toBeUndefined();
 
     expect(cronHandle.stop).toHaveBeenCalledOnce();
+    expect(defaultLoaderStop).toHaveBeenCalledTimes(1);
     expect(log.warn).toHaveBeenCalledWith(
       expect.objectContaining({ event: "shutdown_already_in_progress" }),
       "shutdown",
