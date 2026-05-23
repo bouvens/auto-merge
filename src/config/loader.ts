@@ -2,7 +2,9 @@ import type { Octokit } from "@octokit/core";
 import { LRUCache } from "lru-cache";
 import { LineCounter, parseDocument } from "yaml";
 import { createFailureCheckRun } from "../cascade/checkRun.js";
+import { log } from "../log.js";
 import type { NotificationChannel } from "../notify/channel.js";
+import { getDefaultConfig } from "./defaultLoader.js";
 import { type Config, ConfigSchema } from "./schema.js";
 
 export interface ConfigError {
@@ -85,53 +87,87 @@ export async function loadConfig(deps: {
     });
     const data = resp.data as { content?: string; encoding?: string };
     if (!data.content || data.encoding !== "base64") {
+      const fallback = getDefaultConfig();
+      if (fallback) {
+        // Default fallback never enters the per-sha LRU — only repo-scoped stale-ok caches.
+        repoConfigCache.set(`${deps.owner}/${deps.repo}`, fallback.config);
+        repoConfigSource.set(`${deps.owner}/${deps.repo}`, fallback.source);
+        log.info(
+          { event: "config_resolved", owner: deps.owner, repo: deps.repo, source: fallback.source },
+          "config",
+        );
+        return { config: fallback.config, errors: [], source: fallback.source };
+      }
       const errors: ConfigError[] = [
         { line: 1, col: 1, message: "config file not found or not a file" },
       ];
       await createInvalidConfigCheckRun(deps, errors);
-      void deps.notify?.notify({
-        kind: "config_invalid",
-        installation_id: deps.installation_id,
-        repo: `${deps.owner}/${deps.repo}`,
-        config_path: ".github/auto-merge.yml",
-        zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
-      }).catch(() => undefined);
+      void deps.notify
+        ?.notify({
+          kind: "config_invalid",
+          installation_id: deps.installation_id,
+          repo: `${deps.owner}/${deps.repo}`,
+          config_path: ".github/auto-merge.yml",
+          zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+        })
+        .catch(() => undefined);
       return { errors };
     }
     // GitHub encodes file content as base64 with embedded newlines — strip before decoding.
     text = Buffer.from(data.content.replace(/\n/g, ""), "base64").toString("utf8");
   } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status === 404) {
+      const fallback = getDefaultConfig();
+      if (fallback) {
+        repoConfigCache.set(`${deps.owner}/${deps.repo}`, fallback.config);
+        repoConfigSource.set(`${deps.owner}/${deps.repo}`, fallback.source);
+        log.info(
+          { event: "config_resolved", owner: deps.owner, repo: deps.repo, source: fallback.source },
+          "config",
+        );
+        return { config: fallback.config, errors: [], source: fallback.source };
+      }
+    }
     const message = err instanceof Error ? err.message : String(err);
     const errors: ConfigError[] = [
       { line: 1, col: 1, message: `failed to fetch config: ${message}` },
     ];
     await createInvalidConfigCheckRun(deps, errors);
-    void deps.notify?.notify({
-      kind: "config_invalid",
-      installation_id: deps.installation_id,
-      repo: `${deps.owner}/${deps.repo}`,
-      config_path: ".github/auto-merge.yml",
-      zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
-    }).catch(() => undefined);
+    void deps.notify
+      ?.notify({
+        kind: "config_invalid",
+        installation_id: deps.installation_id,
+        repo: `${deps.owner}/${deps.repo}`,
+        config_path: ".github/auto-merge.yml",
+        zod_error: errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+      })
+      .catch(() => undefined);
     return { errors };
   }
 
   const result = parseConfig(text);
   if (result.errors.length > 0) {
     await createInvalidConfigCheckRun(deps, result.errors);
-    void deps.notify?.notify({
-      kind: "config_invalid",
-      installation_id: deps.installation_id,
-      repo: `${deps.owner}/${deps.repo}`,
-      config_path: ".github/auto-merge.yml",
-      zod_error: result.errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
-    }).catch(() => undefined);
+    void deps.notify
+      ?.notify({
+        kind: "config_invalid",
+        installation_id: deps.installation_id,
+        repo: `${deps.owner}/${deps.repo}`,
+        config_path: ".github/auto-merge.yml",
+        zod_error: result.errors.map((e) => `L${e.line}:${e.col} ${e.message}`).join("; "),
+      })
+      .catch(() => undefined);
     return result;
   }
 
   cache.set(key, result.config!);
   repoConfigCache.set(`${deps.owner}/${deps.repo}`, result.config!);
   repoConfigSource.set(`${deps.owner}/${deps.repo}`, "repo");
+  log.info(
+    { event: "config_resolved", owner: deps.owner, repo: deps.repo, source: "repo" },
+    "config",
+  );
   return { ...result, source: "repo" };
 }
 
