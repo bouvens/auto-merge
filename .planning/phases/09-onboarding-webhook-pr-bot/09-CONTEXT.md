@@ -75,12 +75,11 @@ Phase НЕ занимается: `/diagnose` (Phase 10); release-артефак�
 - **D-25:** Template в `src/onboarding/templates.ts` как pure-function `buildPrBody({owner, repo, defaultBranch, senderLogin?, publicUrl}): string`. Unit-тестируется на snapshot.
 
 ### Workflow + config templates (ONBOARD-02)
-- **D-26:** `.github/auto-merge.yml` template (минимальный валидный config):
+- **D-26:** `.github/auto-merge.yml` template (минимальный валидный config). **CORRIGENDUM 2026-05-24:** ранее в D-26 ошибочно приводился формат `cascade: { source: ... }` — реальная `ConfigSchema` (`src/config/schema.ts:20-27`) определена плоско, без обёртки `cascade:` и с полем `main_branch` (не `source`). Канонический template (проходит `ConfigSchema.parse`):
   ```yaml
-  cascade:
-    source: {{default_branch}}
-    # release_branch: release  # uncomment if you have a staging/release branch between source and dev
-    dev_branch: dev
+  main_branch: {{default_branch}}
+  # release_branch: release  # uncomment if you have a staging/release branch between source and dev
+  dev_branch: dev
   ```
   Schema-валидный (проверяется `src/config/schema.ts`), commented-out hint для release_branch.
 - **D-27:** `.github/workflows/auto-merge-dispatch.yml` — копия v1.0 README example (workflow_dispatch trigger, env `APP_URL`). Хранится как string-литерал в `templates.ts`, без template substitution (нет per-repo вариаций).
