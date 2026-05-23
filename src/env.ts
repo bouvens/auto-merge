@@ -20,6 +20,9 @@ const Base = z.object({
   NOTIFY_HEALTHCHECK_TTL_MS: z.coerce.number().int().positive().default(900_000),
   SETUP_ENABLED: z.coerce.boolean().default(false),
   SETUP_PUBLIC_URL: z.url().optional(),
+  // Staged regardless of SETUP_ENABLED so downstream stale-credentials check reads them unconditionally; max(34) mirrors GitHub App "name" length cap.
+  SETUP_APP_NAME: z.string().min(1).max(34).default("auto-merge"),
+  SETUP_OUTPUT_DIR: z.string().default("./data"),
   DEFAULT_CASCADE_CONFIG_FILE: z.string().optional(),
   DEFAULT_CASCADE_CONFIG_YAML: z.string().optional(),
   DEFAULT_CONFIG_RELOAD_MS: z.coerce.number().int().positive().default(60_000),
