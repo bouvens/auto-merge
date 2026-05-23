@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
 import { type CascadeJob, makeRunCascade } from "./cascade/orchestrator.js";
@@ -12,6 +13,11 @@ import { createNotifyHealthChecker, type NotifyStatus } from "./notify/healthChe
 import { SlackChannel } from "./notify/slack.js";
 import { TelegramChannel } from "./notify/telegram.js";
 import { buildServer } from "./server.js";
+import {
+  checkStaleOnBoot,
+  createCredentialsStore,
+  type CredentialsStore,
+} from "./setup/credentials.js";
 import { makeShutdown } from "./shutdown.js";
 import { dedup } from "./webhook/dedup.js";
 import { createMultiQueue } from "./webhook/multiQueue.js";
@@ -20,6 +26,14 @@ const env = loadEnv();
 const appLog = initLogger(env);
 // R-2: must complete before app.listen() so first webhook sees a populated default. Fail-fast on missing/invalid file mirrors loadEnv() symmetry.
 initDefaultConfigLoader(env, appLog);
+
+// D-04: stale cleanup runs before listen so a leftover credentials.env from a crashed setup never survives a restart.
+let credentialsStore: CredentialsStore | undefined;
+if (env.SETUP_ENABLED) {
+  mkdirSync(env.SETUP_OUTPUT_DIR, { recursive: true });
+  checkStaleOnBoot(env.SETUP_OUTPUT_DIR, appLog);
+  credentialsStore = createCredentialsStore({ dir: env.SETUP_OUTPUT_DIR, log: appLog });
+}
 
 let app: FastifyInstance | undefined;
 let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>> | undefined;
@@ -98,6 +112,7 @@ try {
     dedup,
     queue: multiQueue,
     notify,
+    credentials: credentialsStore,
   });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   // AFTER listen so 3s × N probes never delay readiness for k8s rolling restart.
