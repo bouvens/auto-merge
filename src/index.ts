@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
 import { type CascadeJob, makeRunCascade } from "./cascade/orchestrator.js";
+import { initDefaultConfigLoader, stopDefaultConfigLoader } from "./config/defaultLoader.js";
 import { getRepoConfig } from "./config/loader.js";
 import { startCron } from "./cron/safetyNet.js";
 import { loadEnv } from "./env.js";
@@ -17,6 +18,8 @@ import { createMultiQueue } from "./webhook/multiQueue.js";
 
 const env = loadEnv();
 const appLog = initLogger(env);
+// R-2: must complete before app.listen() so first webhook sees a populated default. Fail-fast on missing/invalid file mirrors loadEnv() symmetry.
+initDefaultConfigLoader(env, appLog);
 
 let app: FastifyInstance | undefined;
 let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>> | undefined;
@@ -109,6 +112,7 @@ const shutdown = makeShutdown({
   app,
   cronHandle,
   multiQueue,
+  defaultLoaderStop: stopDefaultConfigLoader,
   log: appLog,
   shutdownTimeoutMs: env.SHUTDOWN_TIMEOUT,
 });
