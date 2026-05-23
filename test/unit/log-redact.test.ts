@@ -68,4 +68,61 @@ describe("pino redact", () => {
     const out = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
     expect(out["private_key"]).toBe("[REDACTED]");
   });
+
+  describe("Phase 8 setup-credential redactions", () => {
+    it("redacts pem at root level", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info({ pem: "-----BEGIN RSA PRIVATE KEY-----\nXXX" }, "msg");
+      const out = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+      expect(out["pem"]).toBe("[REDACTED]");
+      expect(JSON.stringify(out)).not.toContain("BEGIN");
+    });
+
+    it("redacts nested pem, client_secret, webhook_secret via wildcard", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info(
+        { payload: { pem: "PEM-VAL", client_secret: "CS-VAL", webhook_secret: "WS-VAL" } },
+        "msg",
+      );
+      const out = JSON.parse(lines[0] ?? "{}") as {
+        payload: Record<string, unknown>;
+      };
+      expect(out.payload["pem"]).toBe("[REDACTED]");
+      expect(out.payload["client_secret"]).toBe("[REDACTED]");
+      expect(out.payload["webhook_secret"]).toBe("[REDACTED]");
+      const serialized = JSON.stringify(out);
+      expect(serialized).not.toContain("PEM-VAL");
+      expect(serialized).not.toContain("CS-VAL");
+      expect(serialized).not.toContain("WS-VAL");
+    });
+
+    it("redacts client_secret at root level", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info({ client_secret: "topsecret-cs" }, "msg");
+      const out = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+      expect(out["client_secret"]).toBe("[REDACTED]");
+    });
+
+    it("redacts webhook_secret at root level", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info({ webhook_secret: "topsecret-ws" }, "msg");
+      const out = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+      expect(out["webhook_secret"]).toBe("[REDACTED]");
+    });
+
+    it("redacts state at root level", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info({ state: "csrf-state-abc" }, "msg");
+      const out = JSON.parse(lines[0] ?? "{}") as Record<string, unknown>;
+      expect(out["state"]).toBe("[REDACTED]");
+    });
+
+    it("redacts nested state via wildcard", async () => {
+      const { logger, lines } = await makeLogger();
+      logger.info({ outer: { state: "csrf-state-def" } }, "msg");
+      const out = JSON.parse(lines[0] ?? "{}") as { outer: { state: unknown } };
+      expect(out.outer.state).toBe("[REDACTED]");
+      expect(JSON.stringify(out)).not.toContain("csrf-state-def");
+    });
+  });
 });
