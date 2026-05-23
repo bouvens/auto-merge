@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/core";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { loadConfig } from "../../src/config/loader.js";
+import { getRepoConfigSource, loadConfig } from "../../src/config/loader.js";
 
 const VALID_YAML = "main_branch: main\ndev_branch: dev\n";
 const VALID_YAML_B64 = Buffer.from(VALID_YAML).toString("base64");
@@ -42,6 +42,8 @@ describe("loadConfig — GitHub Contents API fetch", () => {
     const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-fetch-01", installation_id: 0 });
     expect(result.errors).toHaveLength(0);
     expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(result.source).toBe("repo");
+    expect(getRepoConfigSource("o", "r")).toBe("repo");
     expect(callCounts["sha-fetch-01"]).toBe(1);
   });
 

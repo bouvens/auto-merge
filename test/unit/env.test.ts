@@ -293,4 +293,34 @@ describe("loadEnv", () => {
       expect(env.NOTIFY_RETRY_ATTEMPTS).toBe(5);
     });
   });
+
+  describe("Phase 7 config default fallback env fields (D-04)", () => {
+    it("applies default: DEFAULT_CONFIG_RELOAD_MS=60000", async () => {
+      setValidInlineEnv();
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.DEFAULT_CONFIG_RELOAD_MS).toBe(60_000);
+    });
+
+    it("coerces DEFAULT_CONFIG_RELOAD_MS=15000 to number", async () => {
+      setValidInlineEnv({ DEFAULT_CONFIG_RELOAD_MS: "15000" });
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.DEFAULT_CONFIG_RELOAD_MS).toBe(15_000);
+    });
+
+    it("rejects DEFAULT_CONFIG_RELOAD_MS=0 (must be positive)", async () => {
+      setValidInlineEnv({ DEFAULT_CONFIG_RELOAD_MS: "0" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it("rejects DEFAULT_CONFIG_RELOAD_MS='abc' (non-numeric)", async () => {
+      setValidInlineEnv({ DEFAULT_CONFIG_RELOAD_MS: "abc" });
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
 });
