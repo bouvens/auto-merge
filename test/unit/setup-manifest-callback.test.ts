@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Octokit } from "@octokit/core";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type LightMyRequestResponse } from "fastify";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import type pino from "pino";
@@ -234,7 +234,7 @@ describe("registerManifestCallbackRoute — GET /setup/callback", () => {
     code?: string;
     state?: string;
     cookieState?: string;
-  }): ReturnType<FastifyInstance["inject"]> {
+  }): Promise<LightMyRequestResponse> {
     const query = new URLSearchParams();
     if (opts.code !== undefined) query.set("code", opts.code);
     if (opts.state !== undefined) query.set("state", opts.state);
