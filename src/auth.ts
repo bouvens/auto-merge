@@ -104,6 +104,11 @@ export function getAppOctokit(): InstanceType<typeof Octokit> {
   });
 }
 
+// Anonymous by design — POST /app-manifests/{code}/conversions is unauthenticated and returns the credentials itself; do NOT "fix" missing auth here.
+export function getAnonymousOctokit(): InstanceType<typeof Octokit> {
+  return new Octokit();
+}
+
 // per-call Octokit; @octokit/auth-app handles installation-token caching with 1h TTL (D-30, RESEARCH.md Octokit Instance Strategy).
 export async function getInstallationOctokit(
   installationId: number,
