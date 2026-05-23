@@ -80,16 +80,17 @@ describe("pino redact", () => {
 
     it("redacts nested pem, client_secret, webhook_secret via wildcard", async () => {
       const { logger, lines } = await makeLogger();
+      // Outer key 'creds' deliberately not on REDACT_PATHS so wildcard hits inner keys, not the whole object.
       logger.info(
-        { payload: { pem: "PEM-VAL", client_secret: "CS-VAL", webhook_secret: "WS-VAL" } },
+        { creds: { pem: "PEM-VAL", client_secret: "CS-VAL", webhook_secret: "WS-VAL" } },
         "msg",
       );
       const out = JSON.parse(lines[0] ?? "{}") as {
-        payload: Record<string, unknown>;
+        creds: Record<string, unknown>;
       };
-      expect(out.payload["pem"]).toBe("[REDACTED]");
-      expect(out.payload["client_secret"]).toBe("[REDACTED]");
-      expect(out.payload["webhook_secret"]).toBe("[REDACTED]");
+      expect(out.creds["pem"]).toBe("[REDACTED]");
+      expect(out.creds["client_secret"]).toBe("[REDACTED]");
+      expect(out.creds["webhook_secret"]).toBe("[REDACTED]");
       const serialized = JSON.stringify(out);
       expect(serialized).not.toContain("PEM-VAL");
       expect(serialized).not.toContain("CS-VAL");

@@ -25,6 +25,14 @@ const REDACT_PATHS = [
   "*.payload",
   "err.event.payload",
   "event.payload",
+  "pem",
+  "*.pem",
+  "client_secret",
+  "*.client_secret",
+  "webhook_secret",
+  "*.webhook_secret",
+  "state",
+  "*.state",
 ];
 
 export type LogDestination = { write: (chunk: string) => void };
