@@ -6,6 +6,8 @@ export interface ShutdownDeps {
   app: FastifyInstance | undefined;
   cronHandle: { stop: () => Promise<void> } | undefined;
   multiQueue: MultiQueue<unknown> | undefined;
+  // sync clearInterval (no in-flight work to drain)
+  defaultLoaderStop: () => void;
   log: pino.Logger;
   shutdownTimeoutMs: number;
 }
@@ -36,6 +38,8 @@ export function makeShutdown(deps: ShutdownDeps): (sig: string) => Promise<void>
     try {
       // D-18: stop cron first so no new jobs enter the queue while we drain.
       if (deps.cronHandle) await deps.cronHandle.stop();
+      // Clear the defaultLoader interval before app.close — sync, never throws (per defaultLoader.stop contract).
+      deps.defaultLoaderStop();
       await deps.app?.close();
       // Drain timeout exits 0 per D-19 (timeout is not an error).
       if (deps.multiQueue) await deps.multiQueue.drain(deps.shutdownTimeoutMs);
