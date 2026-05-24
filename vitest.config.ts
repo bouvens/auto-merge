@@ -5,7 +5,7 @@ export default defineConfig({
     // globals=false: avoids polluting the global scope; import test helpers explicitly per file.
     globals: false,
     environment: "node",
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "src/**/*.test.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
