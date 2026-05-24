@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
-status: executing
-last_updated: "2026-05-24T15:10:00.000Z"
+status: ready_to_plan
+last_updated: 2026-05-24T10:32:27.851Z
 last_activity: 2026-05-24
 progress:
   total_phases: 6
@@ -11,6 +11,7 @@ progress:
   total_plans: 24
   completed_plans: 24
   percent: 67
+stopped_at: Phase 09 complete (10/10) — ready to discuss Phase 10
 ---
 
 # State: auto-merge
@@ -21,13 +22,13 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 **Core Value:** Любой коммит, попавший в верхнюю ветку каскада, без участия человека доезжает до нижних веток — а если не доезжает (конфликт), команда сразу знает: кто, где, в каком репо, что чинить.
 
-**Current Focus:** Phase 09 — onboarding-webhook-pr-bot
+**Current Focus:** Phase 10 — diagnose endpoint
 
 ## Current Position
 
-Phase: 09 (onboarding-webhook-pr-bot) — READY FOR VERIFIER
-Plan: 10 of 10 — completed
-Status: All plans shipped; integration test green (614/614)
+Phase: 10
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-24
 
 ## Last Milestone
