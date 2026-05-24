@@ -83,8 +83,9 @@ describe("onboarding/tokenRetry.getInstallationOctokitWithRetry", () => {
     expect(result).toBeUndefined();
     expect(vi.mocked(authModule.getInstallationOctokit)).toHaveBeenCalledTimes(4);
     expect(logErrorSpy).toHaveBeenCalledTimes(1);
-    const [payload] = logErrorSpy.mock.calls[0];
-    expect(payload).toMatchObject({
+    const call = logErrorSpy.mock.calls[0];
+    expect(call).toBeDefined();
+    expect(call?.[0]).toMatchObject({
       event: "onboard_token_mint_failed",
       installation_id: installationId,
       attempt: 3,
@@ -100,7 +101,7 @@ describe("onboarding/tokenRetry.getInstallationOctokitWithRetry", () => {
     expect(result).toBeUndefined();
     expect(vi.mocked(authModule.getInstallationOctokit)).toHaveBeenCalledTimes(1);
     expect(logErrorSpy).toHaveBeenCalledTimes(1);
-    expect(logErrorSpy.mock.calls[0][0]).toMatchObject({
+    expect(logErrorSpy.mock.calls[0]?.[0]).toMatchObject({
       event: "onboard_token_mint_failed",
       installation_id: installationId,
       attempt: 0,
