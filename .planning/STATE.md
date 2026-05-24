@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T08:32:09.975Z"
+last_updated: "2026-05-24T13:36:30Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 20
-  percent: 50
+  completed_plans: 21
+  percent: 52
 ---
 
 # State: auto-merge
@@ -26,7 +26,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -56,9 +56,9 @@ Last activity: 2026-05-24
 
 ## Session Continuity
 
-**Last action:** Plan 09-06 shipped — `MultiQueue.clearByInstallation` (additive extension of FROZEN multiQueue, +14/-0 lines, slash-boundary prefix match, detach-not-abort semantics). 4 downstream mocks widened. 5 new unit tests + 7 pre-existing pass; full suite 560/560 green.
+**Last action:** Plan 09-07 shipped — `MultiChannel` gains optional `suppressionCheck` 2nd ctor arg. queue_overflow id extracted from `key` prefix (D-21); `NotifyEvent` union FROZEN. 11 unit tests; full suite 589/589 green. Pre-existing TS2352 in `onboarding-onboardRepo.test.ts` logged in `deferred-items.md`.
 
-**Next action:** Continue Phase 9 execution — Plan 09-05 (skipped in Wave 3 order — execute now) or Plan 09-07 next, per wave plan.
+**Next action:** Plan 09-08 — onboarding handler (p-limit batch + fire-and-forget + aggregate summary).
 
 ---
 *State initialized: 2026-05-20*
