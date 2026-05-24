@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T11:56:40.446Z"
+last_updated: "2026-05-24T12:04:17Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 29
-  completed_plans: 25
-  percent: 67
+  completed_plans: 26
+  percent: 70
 ---
 
 # State: auto-merge
@@ -26,7 +26,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 10 (diagnose-endpoint) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -53,12 +53,14 @@ Last activity: 2026-05-24
 - `installation_repositories` batched payload → p-limit(2) standalone semaphore, всё в одном webhook handler fire-and-forget; **MultiQueue не используется** (Phase 9 reinterpretation of SC2, см. 09-CONTEXT.md <sc_reinterpretations>).
 - Boot notify check: format errors → fail-fast, connectivity errors → degraded mode (Pitfall 11).
 - v1.0 components FROZEN: cascade/, MultiQueue, pushHandler, dispatch, notify dispatcher, cron safetyNet, shutdown, config/schema.ts.
+- Plan 10-02: `requiredPermissions` injected as `runProbes` dependency (not imported from handler) — keeps `probes.ts` free of forward-imports; handler keeps canonical constant per D-15.
+- Plan 10-02: MSW handler ordering rule — base handlers via one `server.use(...happy)` call, per-test overrides via a second `server.use(override)` call; spreading both into a single `server.use()` resolves the first-in-array as winner and silently breaks override intent.
 
 ## Session Continuity
 
-**Last action:** Plan 09-10 shipped — msw-driven end-to-end integration test (`test/integration/onboarding-bulk-install.test.ts`, 455 LOC) covers SC1 (draft PR per repo), SC2 (bulk 80 repos + p-limit(2) + 0 user notify), SC3 (closed-no-merge idempotency), SC4 (protection-block → ONE aggregate env Slack/Telegram, NO Issue), SC5 (installation.deleted → 0 GitHub API calls). Full suite 614/614 green; lint:fix exit 0; pre-existing TS2352 in `onboarding-onboardRepo.test.ts` already in deferred-items.md.
+**Last action:** Plan 10-02 shipped — `src/diagnose/types.ts` (D-10 contracts) + `src/diagnose/probes.ts` (runProbes orchestrator: safeProbe wrapper, Promise.allSettled-style parallelism, per-call AbortSignal.timeout(3000), 404-is-data semantics, app-not-installed short-circuit returning full key-set as n/a) + `src/diagnose/probes.test.ts` (10 msw-driven scenarios). Full suite 634/634 green; biome clean; tsc clean (pre-existing TS2352 in `onboarding-onboardRepo.test.ts` still in deferred-items.md).
 
-**Next action:** Phase 9 verifier — confirm all 5 SCs covered + 8 ONBOARD-* requirements traceable.
+**Next action:** Plan 10-03 — Markdown renderer for DiagnoseReport (pure function + snapshot tests).
 
 ---
 *State initialized: 2026-05-20*

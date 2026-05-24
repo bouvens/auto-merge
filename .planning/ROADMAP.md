@@ -114,7 +114,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
   4. Response никогда не содержит full Slack webhook URL / Telegram bot token / private key: Slack URL отображается как `https://hooks.slack.com/services/.../****`, secrets — only `present/absent + byte length`
 **Plans**: 5 plans
 - [x] 10-01-PLAN.md — rate-limit + redaction primitives (src/diagnose/rateLimit.ts, redact.ts)
-- [ ] 10-02-PLAN.md — parallel probes module (src/diagnose/probes.ts + types.ts) composing Phase 6/7
+- [x] 10-02-PLAN.md — parallel probes module (src/diagnose/probes.ts + types.ts) composing Phase 6/7
 - [ ] 10-03-PLAN.md — markdown renderer (src/diagnose/markdown.ts) with snapshot tests
 - [ ] 10-04-PLAN.md — handler + route registration + server.ts/index.ts wiring
 - [ ] 10-05-PLAN.md — end-to-end integration test for DIAG-01..04 Success Criteria
