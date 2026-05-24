@@ -48,10 +48,11 @@ export async function protectionCheck(
 ): Promise<ProtectionResult> {
   const { octokit, owner, repo, appSlug } = deps;
   try {
-    const resp = await octokit.request(
-      "GET /repos/{owner}/{repo}/branches/{branch}/protection",
-      { owner, repo, branch: target },
-    );
+    const resp = await octokit.request("GET /repos/{owner}/{repo}/branches/{branch}/protection", {
+      owner,
+      repo,
+      branch: target,
+    });
     const data = resp.data as ProtectionResponse;
     const matches: BlockingRule[] = [];
     for (const [rule, pred] of Object.entries(RULE_CHECKS)) {

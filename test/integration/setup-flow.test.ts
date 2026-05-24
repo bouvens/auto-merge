@@ -10,7 +10,7 @@ import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
 import { createCredentialsStore } from "../../src/setup/credentials.js";
-import { STATE_COOKIE_NAME, DOWNLOAD_COOKIE_NAME } from "../../src/setup/csrf.js";
+import { DOWNLOAD_COOKIE_NAME, STATE_COOKIE_NAME } from "../../src/setup/csrf.js";
 
 const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 

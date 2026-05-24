@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LRUCache } from "lru-cache";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("notify dedup LRU", () => {
   beforeEach(() => {

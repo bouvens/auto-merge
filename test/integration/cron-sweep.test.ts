@@ -8,14 +8,14 @@ vi.mock("../../src/auth.js", () => ({
   getBotIdentity: vi.fn(() => ({ id: 41898282, login: "auto-merge-test[bot]" })),
 }));
 
-import { getInstallationOctokit, getAppOctokit } from "../../src/auth.js";
+import { getAppOctokit, getInstallationOctokit } from "../../src/auth.js";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
 import { makeRunCascade } from "../../src/cascade/orchestrator.js";
+import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
+import { runCronTick } from "../../src/cron/safetyNet.js";
 import { log } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
 import { createMultiQueue } from "../../src/webhook/multiQueue.js";
-import { runCronTick } from "../../src/cron/safetyNet.js";
-import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
 
 const harness = setupMswGitHub({
   branches: { main: "main-sha-001", release: "release-head", dev: "dev-head" },
@@ -88,7 +88,9 @@ describe("cron safety-net sweep", () => {
     const queue = createMultiQueue<CascadeJob>({
       perKeyMax: 16,
       globalMax: 1000,
-      handler: async () => { handlerCalls += 1; },
+      handler: async () => {
+        handlerCalls += 1;
+      },
       notify: new NoopChannel(),
     });
 
@@ -126,7 +128,9 @@ describe("cron safety-net sweep", () => {
     const queue = createMultiQueue<CascadeJob>({
       perKeyMax: 16,
       globalMax: 1000,
-      handler: async () => { handlerCalls += 1; },
+      handler: async () => {
+        handlerCalls += 1;
+      },
       notify: new NoopChannel(),
     });
 
@@ -140,9 +144,7 @@ describe("cron safety-net sweep", () => {
   });
 
   it("cron tick on same main HEAD twice: second tick deduped by orchestrator", async () => {
-    harness.state.installations = [
-      { id: 33, suspended_at: null, account: { login: "org3" } },
-    ];
+    harness.state.installations = [{ id: 33, suspended_at: null, account: { login: "org3" } }];
     harness.state.installationRepos = {
       33: [{ name: "repo-e", full_name: "org3/repo-e", owner: { login: "org3" } }],
     };

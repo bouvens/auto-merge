@@ -75,12 +75,7 @@ describe("shutdown ordering", () => {
     });
 
     await expect(shutdown("SIGTERM")).rejects.toThrow("exit:0");
-    expect(callOrder).toEqual([
-      "cron.stop",
-      "defaultLoader.stop",
-      "app.close",
-      "queue.drain",
-    ]);
+    expect(callOrder).toEqual(["cron.stop", "defaultLoader.stop", "app.close", "queue.drain"]);
     expect(defaultLoaderStop).toHaveBeenCalledTimes(1);
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
@@ -98,7 +93,12 @@ describe("drain timeout exits 0", () => {
       clearByInstallation: vi.fn().mockReturnValue(0),
       drain: vi.fn().mockImplementation((_timeoutMs: number) => {
         log.warn(
-          { event: "multi_queue_drain_timeout", remaining_keys: ["inst/owner/repo"], remaining_total: 1, timeout_ms: _timeoutMs },
+          {
+            event: "multi_queue_drain_timeout",
+            remaining_keys: ["inst/owner/repo"],
+            remaining_total: 1,
+            timeout_ms: _timeoutMs,
+          },
           "drain-timeout",
         );
         return Promise.resolve();

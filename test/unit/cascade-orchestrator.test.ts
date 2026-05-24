@@ -4,18 +4,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/cascade/plan.js", () => ({ buildCascadePlan: vi.fn() }));
 vi.mock("../../src/cascade/merge.js", () => ({ mergeStep: vi.fn() }));
 vi.mock("../../src/cascade/conflict.js", () => ({ createConflictPR: vi.fn() }));
-vi.mock("../../src/cascade/checkRun.js", () => ({ completeFailure: vi.fn(), createInProgress: vi.fn() }));
+vi.mock("../../src/cascade/checkRun.js", () => ({
+  completeFailure: vi.fn(),
+  createInProgress: vi.fn(),
+}));
 vi.mock("../../src/auth.js", () => ({
   getInstallationOctokit: vi.fn(async () => ({ request: vi.fn() })),
   getBotIdentity: vi.fn(() => ({ login: "my-app[bot]", email: "bot@noreply" })),
 }));
 vi.mock("../../src/config/loader.js", () => ({ loadConfig: vi.fn() }));
 
-import { getInstallationOctokit, getBotIdentity } from "../../src/auth.js";
+import { getBotIdentity, getInstallationOctokit } from "../../src/auth.js";
 import { completeFailure, createInProgress } from "../../src/cascade/checkRun.js";
 import { createConflictPR } from "../../src/cascade/conflict.js";
 import { mergeStep } from "../../src/cascade/merge.js";
-import { type CascadeJob, type PushJob, makeRunCascade } from "../../src/cascade/orchestrator.js";
+import { type CascadeJob, makeRunCascade, type PushJob } from "../../src/cascade/orchestrator.js";
 import { buildCascadePlan } from "../../src/cascade/plan.js";
 import { loadConfig } from "../../src/config/loader.js";
 import { log } from "../../src/log.js";
@@ -242,7 +245,10 @@ describe("runCascade (via makeRunCascade)", () => {
       pr_number: 11,
       reused: false,
     });
-    vi.mocked(createInProgress).mockResolvedValue({ check_run_id: 99, html_url: "https://gh/cr/99" });
+    vi.mocked(createInProgress).mockResolvedValue({
+      check_run_id: 99,
+      html_url: "https://gh/cr/99",
+    });
 
     await makeRunCascadeWithNoop()(job());
 
@@ -312,7 +318,10 @@ describe("runCascade (via makeRunCascade)", () => {
     expect(loadConfigMock).toHaveBeenCalledTimes(1);
     expect(mergeStepMock).toHaveBeenCalledTimes(1);
     const deps = mergeStepMock.mock.calls[0]![0];
-    expect((deps as { source_sha?: string }).source_sha ?? (mergeStepMock.mock.calls[0]![1] as { source_sha: string }).source_sha).toBe("cron-resolved-sha");
+    expect(
+      (deps as { source_sha?: string }).source_sha ??
+        (mergeStepMock.mock.calls[0]![1] as { source_sha: string }).source_sha,
+    ).toBe("cron-resolved-sha");
   });
 
   it("dispatch source → cascade_started log includes sender_login from job payload", async () => {

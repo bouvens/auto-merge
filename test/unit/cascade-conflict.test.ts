@@ -228,7 +228,9 @@ describe("createConflictPR", () => {
     expect(res.ok).toBe(true);
     const body = oc.calls.find((c) => c.route === "POST /repos/{owner}/{repo}/pulls")!.params
       .body as string;
-    expect(body.startsWith("Blocked by branch protection: required_pull_request_reviews")).toBe(true);
+    expect(body.startsWith("Blocked by branch protection: required_pull_request_reviews")).toBe(
+      true,
+    );
     expect(body).toContain("Auto-merge");
   });
 

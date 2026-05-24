@@ -132,7 +132,15 @@ beforeAll(async () => {
     onRepositoriesAdded: async () => {},
     onInstallationDeleted: async () => {},
   };
-  app = await buildServer({ env, log, probot, dedup, queue, notify: new NoopChannel(), onboarding });
+  app = await buildServer({
+    env,
+    log,
+    probot,
+    dedup,
+    queue,
+    notify: new NoopChannel(),
+    onboarding,
+  });
 });
 
 afterAll(async () => {

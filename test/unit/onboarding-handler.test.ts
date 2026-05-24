@@ -5,8 +5,8 @@ import {
   createOnboardingHandlers,
   type OnboardingHandlerDeps,
 } from "../../src/onboarding/handler.js";
-import * as onboardRepoMod from "../../src/onboarding/onboardRepo.js";
 import type { OnboardOutcome } from "../../src/onboarding/onboardRepo.js";
+import * as onboardRepoMod from "../../src/onboarding/onboardRepo.js";
 import * as suppressionMod from "../../src/onboarding/suppressionSet.js";
 
 vi.mock("../../src/onboarding/onboardRepo.js", () => ({
@@ -38,31 +38,42 @@ function buildDeps(overrides: Record<string, unknown> = {}): TestDeps {
     SETUP_PUBLIC_URL: "https://app.example.com",
     ...overrides,
   } as OnboardingHandlerDeps["env"];
-  const octokitFactory = vi.fn(async (_id: number) => undefined) as unknown as TestDeps["octokitFactory"];
+  const octokitFactory = vi.fn(
+    async (_id: number) => undefined,
+  ) as unknown as TestDeps["octokitFactory"];
   return { octokitFactory, multiQueue, env };
 }
 
-function makeInstallationPayload(installationId: number, repos: Array<{ name: string; owner: string }>, opts: {
-  selection?: "selected" | "all";
-  sender?: { login: string; type: string };
-  emptyRepositories?: boolean;
-} = {}): unknown {
+function makeInstallationPayload(
+  installationId: number,
+  repos: Array<{ name: string; owner: string }>,
+  opts: {
+    selection?: "selected" | "all";
+    sender?: { login: string; type: string };
+    emptyRepositories?: boolean;
+  } = {},
+): unknown {
   return {
     action: "created",
     installation: {
       id: installationId,
       repository_selection: opts.selection,
     },
-    repositories: opts.emptyRepositories ? [] : repos.map((r) => ({
-      name: r.name,
-      full_name: `${r.owner}/${r.name}`,
-    })),
+    repositories: opts.emptyRepositories
+      ? []
+      : repos.map((r) => ({
+          name: r.name,
+          full_name: `${r.owner}/${r.name}`,
+        })),
     repository_selection: opts.selection,
     sender: opts.sender,
   };
 }
 
-function makeAddedPayload(installationId: number, repos: Array<{ name: string; owner: string }>): unknown {
+function makeAddedPayload(
+  installationId: number,
+  repos: Array<{ name: string; owner: string }>,
+): unknown {
   return {
     action: "added",
     installation: { id: installationId },
@@ -125,7 +136,17 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     vi.mocked(onboardRepoMod.onboardRepo).mockImplementation(
       (args) =>
         new Promise((r) =>
-          setTimeout(() => r({ status: "created", owner: args.owner, repo: args.repo, pr_number: 1, pr_url: "u" }), 200),
+          setTimeout(
+            () =>
+              r({
+                status: "created",
+                owner: args.owner,
+                repo: args.repo,
+                pr_number: 1,
+                pr_url: "u",
+              }),
+            200,
+          ),
         ),
     );
     const deps = buildDeps();
@@ -220,9 +241,16 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
 
   it("aggregates multiple bad outcomes into one summary text", async () => {
     vi.mocked(onboardRepoMod.onboardRepo).mockImplementation(async (args) => {
-      if (args.repo === "rblock") return { status: "protection_blocked", owner: args.owner, repo: args.repo };
+      if (args.repo === "rblock")
+        return { status: "protection_blocked", owner: args.owner, repo: args.repo };
       if (args.repo === "rfail") {
-        return { status: "failed", owner: args.owner, repo: args.repo, step: "get_repo", err_message: "boom" };
+        return {
+          status: "failed",
+          owner: args.owner,
+          repo: args.repo,
+          step: "get_repo",
+          err_message: "boom",
+        };
       }
       return { status: "created", owner: args.owner, repo: args.repo, pr_number: 1, pr_url: "u" };
     });
@@ -256,7 +284,9 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     expect(vi.mocked(onboardRepoMod.onboardRepo)).not.toHaveBeenCalled();
     const skipLog = warnSpy.mock.calls.find(
       (c) =>
-        typeof c[0] === "object" && c[0] !== null && (c[0] as { event?: string }).event === "onboard_skipped_all_repos_no_list",
+        typeof c[0] === "object" &&
+        c[0] !== null &&
+        (c[0] as { event?: string }).event === "onboard_skipped_all_repos_no_list",
     );
     expect(skipLog).toBeDefined();
     warnSpy.mockRestore();
@@ -273,7 +303,10 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     });
     await flushAll();
     expect(vi.mocked(onboardRepoMod.onboardRepo)).toHaveBeenCalledTimes(2);
-    const repos = vi.mocked(onboardRepoMod.onboardRepo).mock.calls.map((c) => c[0].repo).sort();
+    const repos = vi
+      .mocked(onboardRepoMod.onboardRepo)
+      .mock.calls.map((c) => c[0].repo)
+      .sort();
     expect(repos).toEqual(["ra", "rb"]);
   });
 
@@ -325,11 +358,15 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     const deps = buildDeps();
     deps.multiQueue.clearByInstallation.mockReturnValue(3);
     const handlers = createOnboardingHandlers(deps);
-    await handlers.onInstallationDeleted({ payload: { action: "deleted", installation: { id: 42 } } });
+    await handlers.onInstallationDeleted({
+      payload: { action: "deleted", installation: { id: 42 } },
+    });
     expect(deps.multiQueue.clearByInstallation).toHaveBeenCalledWith(42);
     const evLog = infoSpy.mock.calls.find(
       (c) =>
-        typeof c[0] === "object" && c[0] !== null && (c[0] as { event?: string }).event === "onboard_installation_cleaned",
+        typeof c[0] === "object" &&
+        c[0] !== null &&
+        (c[0] as { event?: string }).event === "onboard_installation_cleaned",
     );
     expect(evLog).toBeDefined();
     expect(((evLog as unknown[])[0] as { lanes_dropped: number }).lanes_dropped).toBe(3);
@@ -342,10 +379,14 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     const deps = buildDeps();
     deps.multiQueue.clearByInstallation.mockReturnValue(0);
     const handlers = createOnboardingHandlers(deps);
-    await handlers.onInstallationDeleted({ payload: { action: "deleted", installation: { id: 11 } } });
+    await handlers.onInstallationDeleted({
+      payload: { action: "deleted", installation: { id: 11 } },
+    });
     const evLog = infoSpy.mock.calls.find(
       (c) =>
-        typeof c[0] === "object" && c[0] !== null && (c[0] as { event?: string }).event === "onboard_installation_cleaned",
+        typeof c[0] === "object" &&
+        c[0] !== null &&
+        (c[0] as { event?: string }).event === "onboard_installation_cleaned",
     );
     expect(evLog).toBeDefined();
     expect(((evLog as unknown[])[0] as { lanes_dropped: number }).lanes_dropped).toBe(0);
@@ -359,13 +400,21 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
       payload: makeInstallationPayload(1, [{ owner: "o", name: "r1" }]),
     });
     await flushAll();
-    const callArg = vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0]![0] as { octokitFactory: unknown };
+    const callArg = vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0]![0] as {
+      octokitFactory: unknown;
+    };
     expect(callArg.octokitFactory).toBe(deps.octokitFactory);
   });
 
   // Silence unused-import lints — referenced types are part of the public API surface under test.
   it("references OnboardOutcome type", () => {
-    const _ok: OnboardOutcome = { status: "created", owner: "o", repo: "r", pr_number: 1, pr_url: "u" };
+    const _ok: OnboardOutcome = {
+      status: "created",
+      owner: "o",
+      repo: "r",
+      pr_number: 1,
+      pr_url: "u",
+    };
     expect(_ok.status).toBe("created");
   });
 });

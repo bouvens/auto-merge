@@ -6,10 +6,10 @@ import {
   DOWNLOAD_COOKIE_NAME,
   readDownloadCookie,
   readStateCookie,
+  STATE_COOKIE_NAME,
   safeEqualHex,
   setDownloadCookie,
   setStateCookie,
-  STATE_COOKIE_NAME,
 } from "../../src/setup/csrf.js";
 
 type HeaderMap = Map<string, string>;

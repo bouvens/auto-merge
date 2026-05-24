@@ -54,9 +54,7 @@ describe("renderManifestForm — pure HTML renderer", () => {
 
   it("uses organisation-scoped URL when org is provided", () => {
     const html = renderManifestForm(baseEnv, "state-abc", "acme");
-    expect(html).toContain(
-      'action="https://github.com/organizations/acme/settings/apps/new"',
-    );
+    expect(html).toContain('action="https://github.com/organizations/acme/settings/apps/new"');
   });
 
   it("embeds the manifest JSON via hidden input with HTML-escaped quotes", () => {
@@ -207,9 +205,7 @@ describe("registerManifestFormRoute — GET /setup/new", () => {
     const res = await app.inject({ method: "GET", url: "/setup/new?org=acme" });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain(
-      'action="https://github.com/organizations/acme/settings/apps/new"',
-    );
+    expect(res.body).toContain('action="https://github.com/organizations/acme/settings/apps/new"');
   });
 
   it("400 invalid_org with no Set-Cookie when ?org=../bad (path traversal)", async () => {

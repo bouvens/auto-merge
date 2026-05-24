@@ -17,8 +17,7 @@ const EXIT_THROW_MARKER = "__process_exit_throw__";
 
 function isExitThrow(e: unknown): boolean {
   return (
-    e instanceof Error &&
-    (e as Error & { [EXIT_THROW_MARKER]?: true })[EXIT_THROW_MARKER] === true
+    e instanceof Error && (e as Error & { [EXIT_THROW_MARKER]?: true })[EXIT_THROW_MARKER] === true
   );
 }
 

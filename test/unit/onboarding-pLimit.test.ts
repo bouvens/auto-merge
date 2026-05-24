@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import pLimit from "../../src/onboarding/pLimit.js";
 
-function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (v: T) => void;
+  reject: (e: unknown) => void;
+} {
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
   const promise = new Promise<T>((res, rej) => {
@@ -54,7 +58,11 @@ describe("onboarding/pLimit", () => {
   it("propagates rejection to the caller without blocking subsequent tasks", async () => {
     const limit = pLimit(1);
     const boom = new Error("boom");
-    await expect(limit(async () => { throw boom; })).rejects.toBe(boom);
+    await expect(
+      limit(async () => {
+        throw boom;
+      }),
+    ).rejects.toBe(boom);
     // Slot must be released even when the task rejected.
     const result = await limit(async () => 42);
     expect(result).toBe(42);

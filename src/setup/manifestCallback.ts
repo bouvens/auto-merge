@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { Octokit } from "@octokit/core";
 import type { FastifyInstance } from "fastify";
-import { Octokit } from "@octokit/core";
 import type pino from "pino";
 import { getAnonymousOctokit } from "../auth.js";
 import type { Env } from "../env.js";
@@ -169,10 +169,7 @@ export function registerManifestCallbackRoute(app: FastifyInstance, deps: Callba
         data = resp.data as ConversionResponseData;
       } catch (err) {
         // Log the error string, not the full Error object — RequestError carries the response body which may include sensitive fields.
-        deps.log.error(
-          { event: "setup_conversion_failed", err: String(err) },
-          "setup",
-        );
+        deps.log.error({ event: "setup_conversion_failed", err: String(err) }, "setup");
         return reply.code(502).send({ error: "conversion_failed" });
       }
 
@@ -251,10 +248,7 @@ function parseCredentialsEnv(body: string): CredentialsPayload {
 }
 
 // Cookie-gated single-use download (D-17, T-08-22 / T-08-24). The first successful GET clears the cookie via Max-Age=0.
-export function registerCredentialsDownloadRoute(
-  app: FastifyInstance,
-  deps: DownloadDeps,
-): void {
+export function registerCredentialsDownloadRoute(app: FastifyInstance, deps: DownloadDeps): void {
   app.get("/setup/credentials.env", async (req, reply) => {
     const dl = readDownloadCookie(req);
     if (!dl) {

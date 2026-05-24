@@ -22,18 +22,12 @@ describe("setup/manifestSchema.buildManifest", () => {
   });
 
   it("hook_attributes.url is SETUP_PUBLIC_URL + /webhook", () => {
-    expect(buildManifest(envA, "s1").hook_attributes.url).toBe(
-      "https://app.example.com/webhook",
-    );
-    expect(buildManifest(envB, "s1").hook_attributes.url).toBe(
-      "https://other.example.org/webhook",
-    );
+    expect(buildManifest(envA, "s1").hook_attributes.url).toBe("https://app.example.com/webhook");
+    expect(buildManifest(envB, "s1").hook_attributes.url).toBe("https://other.example.org/webhook");
   });
 
   it("redirect_url is SETUP_PUBLIC_URL + /setup/callback", () => {
-    expect(buildManifest(envA, "s1").redirect_url).toBe(
-      "https://app.example.com/setup/callback",
-    );
+    expect(buildManifest(envA, "s1").redirect_url).toBe("https://app.example.com/setup/callback");
   });
 
   it("public is false (private App by default)", () => {
@@ -86,8 +80,8 @@ describe("setup/manifestSchema.buildManifest", () => {
   });
 
   it("throws when SETUP_PUBLIC_URL is undefined (defence-in-depth)", () => {
-    expect(() =>
-      buildManifest({ SETUP_APP_NAME: "x", SETUP_PUBLIC_URL: undefined }, "s1"),
-    ).toThrow(/SETUP_PUBLIC_URL/);
+    expect(() => buildManifest({ SETUP_APP_NAME: "x", SETUP_PUBLIC_URL: undefined }, "s1")).toThrow(
+      /SETUP_PUBLIC_URL/,
+    );
   });
 });

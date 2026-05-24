@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type pino from "pino";
 import { Cron } from "croner";
+import type pino from "pino";
 import { getAppOctokit, getInstallationOctokit } from "../auth.js";
+import type { CascadeJob } from "../cascade/orchestrator.js";
 import type { Env } from "../env.js";
 import { log as defaultLog } from "../log.js";
-import type { CascadeJob } from "../cascade/orchestrator.js";
 import { buildKey, type MultiQueue } from "../webhook/multiQueue.js";
 
 type AppInstallation = {
@@ -77,10 +77,7 @@ export async function runCronTick(deps: {
   for await (const inst of listAllInstallations(appOctokit)) {
     if (inst.suspended_at !== null && inst.suspended_at !== undefined) {
       // Suspended installations have their token revoked — skip to avoid a 403 on mint.
-      log.debug(
-        { event: "cron_inst_suspended_skipped", installation_id: inst.id },
-        "cron",
-      );
+      log.debug({ event: "cron_inst_suspended_skipped", installation_id: inst.id }, "cron");
       continue;
     }
 
@@ -91,10 +88,7 @@ export async function runCronTick(deps: {
       instOctokit = await getInstallationOctokit(inst.id);
     } catch (err) {
       // One bad installation must not abort the whole sweep.
-      log.warn(
-        { event: "cron_installation_repos_failed", installation_id: inst.id, err },
-        "cron",
-      );
+      log.warn({ event: "cron_installation_repos_failed", installation_id: inst.id, err }, "cron");
       continue;
     }
 
@@ -116,10 +110,7 @@ export async function runCronTick(deps: {
       }
     } catch (err) {
       // 401/403/404 from listReposAccessibleToInstallation — skip this installation, continue with the rest.
-      log.warn(
-        { event: "cron_installation_repos_failed", installation_id: inst.id, err },
-        "cron",
-      );
+      log.warn({ event: "cron_installation_repos_failed", installation_id: inst.id, err }, "cron");
     }
   }
 

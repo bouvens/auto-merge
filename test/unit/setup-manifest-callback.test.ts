@@ -370,9 +370,11 @@ describe("registerManifestCallbackRoute — GET /setup/callback", () => {
     expect(res.statusCode).toBe(502);
     expect(res.json()).toEqual({ error: "conversion_failed" });
     expect(credentials.exists()).toBe(false);
-    expect((log.error as ReturnType<typeof vi.fn>).mock.calls.some(
-      ([obj]) => (obj as { event?: string }).event === "setup_conversion_failed",
-    )).toBe(true);
+    expect(
+      (log.error as ReturnType<typeof vi.fn>).mock.calls.some(
+        ([obj]) => (obj as { event?: string }).event === "setup_conversion_failed",
+      ),
+    ).toBe(true);
   });
 
   it("500 persist_failed when credentials.persist throws; log includes app_id for operator rescue", async () => {
@@ -423,7 +425,9 @@ describe("registerManifestCallbackRoute — GET /setup/callback", () => {
     for (const call of warnMock.mock.calls) {
       const payload = call[0] as Record<string, unknown>;
       // Presence flags are booleans, never strings.
-      expect(typeof payload.has_cookie === "boolean" || payload.has_cookie === undefined).toBe(true);
+      expect(typeof payload.has_cookie === "boolean" || payload.has_cookie === undefined).toBe(
+        true,
+      );
       expect(payload.state).toBeUndefined();
       expect(payload.cookie).toBeUndefined();
     }
@@ -494,9 +498,7 @@ describe("registerCredentialsDownloadRoute — GET /setup/credentials.env", () =
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.headers["content-disposition"]).toBe(
-      "attachment; filename=credentials.env",
-    );
+    expect(res.headers["content-disposition"]).toBe("attachment; filename=credentials.env");
     const onDisk = credentials.read();
     expect(onDisk).not.toBeNull();
     if (!onDisk) throw new Error("file missing");

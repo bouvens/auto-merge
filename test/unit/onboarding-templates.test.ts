@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { ConfigSchema } from "../../src/config/schema.js";
 import {
-  DISPATCH_WORKFLOW_YML,
   buildPrBody,
   buildYmlConfig,
+  DISPATCH_WORKFLOW_YML,
 } from "../../src/onboarding/templates.js";
 
 describe("buildYmlConfig", () => {

@@ -61,8 +61,7 @@ export const ERROR_MAP: Partial<Record<ErrorKey, (target?: string) => MappedErro
     missing_permission: "—",
   }),
   "branches_protection:403": () => ({
-    summary:
-      "Cannot pre-flight branch protection — App lacks `administration: read` permission.",
+    summary: "Cannot pre-flight branch protection — App lacks `administration: read` permission.",
     missing_permission: "administration:read",
   }),
   "compare:403": () => ({
@@ -87,11 +86,7 @@ export const ERROR_MAP: Partial<Record<ErrorKey, (target?: string) => MappedErro
   }),
 } as const;
 
-export function mapError(
-  endpoint: Endpoint,
-  status: number,
-  target?: string,
-): MappedError | null {
+export function mapError(endpoint: Endpoint, status: number, target?: string): MappedError | null {
   if (status !== 403 && status !== 404) return null;
   const key = `${endpoint}:${status}` as ErrorKey;
   const factory = ERROR_MAP[key];

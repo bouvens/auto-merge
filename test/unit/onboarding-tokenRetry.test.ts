@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { log } from "../../src/log.js";
 import * as authModule from "../../src/auth.js";
+import { log } from "../../src/log.js";
 import { getInstallationOctokitWithRetry } from "../../src/onboarding/tokenRetry.js";
 
 vi.mock("../../src/auth.js", () => ({

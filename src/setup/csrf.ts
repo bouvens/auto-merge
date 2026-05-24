@@ -31,7 +31,12 @@ function buildClearHeader(name: string): string {
 export function setStateCookie(reply: FastifyReply, env: EnvLike, value: string): void {
   reply.header(
     "Set-Cookie",
-    buildCookieHeader({ name: STATE_COOKIE_NAME, value, maxAgeSeconds: STATE_MAX_AGE_SECONDS, env }),
+    buildCookieHeader({
+      name: STATE_COOKIE_NAME,
+      value,
+      maxAgeSeconds: STATE_MAX_AGE_SECONDS,
+      env,
+    }),
   );
 }
 

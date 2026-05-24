@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Octokit } from "@octokit/core";
 import { Cron } from "croner";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
 import type { MultiQueue } from "../../src/webhook/multiQueue.js";
-import type { Octokit } from "@octokit/core";
 
 // Hoisted — vitest moves vi.mock calls to the top of the module before imports.
 vi.mock("../../src/auth.js", () => ({
@@ -21,8 +21,8 @@ vi.mock("../../src/log.js", () => ({
 }));
 
 import { getAppOctokit, getInstallationOctokit } from "../../src/auth.js";
-import { log as mockLog } from "../../src/log.js";
 import { runCronTick, startCron, stopCronGracefully } from "../../src/cron/safetyNet.js";
+import { log as mockLog } from "../../src/log.js";
 
 function makeFakeInstOctokit(repoPages: object[][]) {
   return {
@@ -44,7 +44,9 @@ function makeAppOctokit(installationPages: object[][]) {
   } as unknown as ReturnType<typeof getAppOctokit>;
 }
 
-function makeFakeMultiQueue(): MultiQueue<CascadeJob> & { calls: Array<{ key: string; jobId: string }> } {
+function makeFakeMultiQueue(): MultiQueue<CascadeJob> & {
+  calls: Array<{ key: string; jobId: string }>;
+} {
   const calls: Array<{ key: string; jobId: string }> = [];
   const enqueue = vi.fn((key: string, job: { id: string }) => {
     calls.push({ key, jobId: job.id });
@@ -71,7 +73,10 @@ describe("startCron — empty CRON_SCHEDULE", () => {
       log: mockLog as Parameters<typeof startCron>[0]["log"],
     });
 
-    expect(infoSpy).toHaveBeenCalledWith(expect.objectContaining({ event: "cron_disabled" }), "cron");
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "cron_disabled" }),
+      "cron",
+    );
     await expect(handle.stop()).resolves.toBeUndefined();
     expect(fakeQueue.size()).toBe(0);
   });
@@ -79,7 +84,9 @@ describe("startCron — empty CRON_SCHEDULE", () => {
 
 describe("protect:true skips overlapping tick", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+    vi.useFakeTimers({
+      toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"],
+    });
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -87,7 +94,7 @@ describe("protect:true skips overlapping tick", () => {
 
   it("only one tick runs when a previous tick is still executing", async () => {
     const tickStarts: number[] = [];
-    let releaseRef: { fn: (() => void) | null } = { fn: null };
+    const releaseRef: { fn: (() => void) | null } = { fn: null };
 
     const c = new Cron("* * * * * *", { protect: true }, async () => {
       tickStarts.push(Date.now());

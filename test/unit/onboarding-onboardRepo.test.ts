@@ -57,7 +57,10 @@ describe("onboarding/onboardRepo — all branches", () => {
       "GET /repos/{owner}/{repo}/git/ref/heads/{branch}": () => ({ object: { sha: "abc123" } }),
       "POST /repos/{owner}/{repo}/git/refs": () => ({ ref: "refs/heads/auto-merge/onboarding" }),
       "PUT /repos/{owner}/{repo}/contents/{path}": () => ({ commit: { sha: "c1" } }),
-      "POST /repos/{owner}/{repo}/pulls": () => ({ number: 42, html_url: "https://github.com/acme/widgets/pull/42" }),
+      "POST /repos/{owner}/{repo}/pulls": () => ({
+        number: 42,
+        html_url: "https://github.com/acme/widgets/pull/42",
+      }),
     });
     const outcome = await onboardRepo({
       ...baseArgs,
@@ -71,7 +74,9 @@ describe("onboarding/onboardRepo — all branches", () => {
       pr_number: 42,
       pr_url: "https://github.com/acme/widgets/pull/42",
     });
-    const calls = (mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls.map((c) => c[0]);
+    const calls = (mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls.map(
+      (c) => c[0],
+    );
     expect(calls).not.toContain("GET /repos/{owner}/{repo}");
   });
 
@@ -121,8 +126,15 @@ describe("onboarding/onboardRepo — all branches", () => {
       defaultBranchHint: "main",
       octokitFactory: async () => mock,
     });
-    expect(outcome).toEqual({ status: "skipped", owner: "acme", repo: "widgets", reason: "config_exists" });
-    expect((mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls).toHaveLength(1);
+    expect(outcome).toEqual({
+      status: "skipped",
+      owner: "acme",
+      repo: "widgets",
+      reason: "config_exists",
+    });
+    expect((mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls).toHaveLength(
+      1,
+    );
     expect(infoSpy.mock.calls[0]?.[0]).toMatchObject({ event: "onboard_skipped_config_exists" });
   });
 
@@ -138,7 +150,12 @@ describe("onboarding/onboardRepo — all branches", () => {
       defaultBranchHint: "main",
       octokitFactory: async () => mock,
     });
-    expect(outcome).toEqual({ status: "skipped", owner: "acme", repo: "widgets", reason: "pr_open" });
+    expect(outcome).toEqual({
+      status: "skipped",
+      owner: "acme",
+      repo: "widgets",
+      reason: "pr_open",
+    });
   });
 
   it("idempotency B: closed-no-merge PR → skipped/pr_declined", async () => {
@@ -161,7 +178,13 @@ describe("onboarding/onboardRepo — all branches", () => {
     const mock = makeMockOctokit({
       "GET /repos/{owner}/{repo}/contents/{path}": () => httpError(404),
       "GET /repos/{owner}/{repo}/pulls": () => [
-        { number: 9, state: "closed", merged_at: "2026-01-01T00:00:00Z", html_url: "u", head: HAPPY_HEAD },
+        {
+          number: 9,
+          state: "closed",
+          merged_at: "2026-01-01T00:00:00Z",
+          html_url: "u",
+          head: HAPPY_HEAD,
+        },
       ],
     });
     const outcome = await onboardRepo({
@@ -210,7 +233,11 @@ describe("onboarding/onboardRepo — all branches", () => {
       octokitFactory: async () => mock,
     });
     expect(outcome).toEqual({ status: "protection_blocked", owner: "acme", repo: "widgets" });
-    expect(warnSpy.mock.calls.some((c) => (c[0] as { event?: string }).event === "onboard_protection_blocked")).toBe(true);
+    expect(
+      warnSpy.mock.calls.some(
+        (c) => (c[0] as { event?: string }).event === "onboard_protection_blocked",
+      ),
+    ).toBe(true);
   });
 
   it("createRef 403 → permission_denied/create_ref", async () => {
@@ -225,7 +252,12 @@ describe("onboarding/onboardRepo — all branches", () => {
       defaultBranchHint: "main",
       octokitFactory: async () => mock,
     });
-    expect(outcome).toEqual({ status: "permission_denied", owner: "acme", repo: "widgets", step: "create_ref" });
+    expect(outcome).toEqual({
+      status: "permission_denied",
+      owner: "acme",
+      repo: "widgets",
+      step: "create_ref",
+    });
   });
 
   it("PUT yml 422 → GET sha → re-PUT with sha → created (PUT called twice for yml path)", async () => {
@@ -233,7 +265,8 @@ describe("onboarding/onboardRepo — all branches", () => {
     const mock = makeMockOctokit({
       "GET /repos/{owner}/{repo}/contents/{path}": (p) => {
         if (p.path === ".github/auto-merge.yml" && p.ref === "main") return httpError(404);
-        if (p.path === ".github/auto-merge.yml" && p.ref === "auto-merge/onboarding") return { sha: "blob-sha" };
+        if (p.path === ".github/auto-merge.yml" && p.ref === "auto-merge/onboarding")
+          return { sha: "blob-sha" };
         return httpError(404);
       },
       "GET /repos/{owner}/{repo}/pulls": () => [],
@@ -271,7 +304,12 @@ describe("onboarding/onboardRepo — all branches", () => {
       defaultBranchHint: "main",
       octokitFactory: async () => mock,
     });
-    expect(outcome).toEqual({ status: "permission_denied", owner: "acme", repo: "widgets", step: "put_yml" });
+    expect(outcome).toEqual({
+      status: "permission_denied",
+      owner: "acme",
+      repo: "widgets",
+      step: "put_yml",
+    });
   });
 
   it("POST pulls 422 → fetch existing open PR → return its number", async () => {
@@ -279,7 +317,15 @@ describe("onboarding/onboardRepo — all branches", () => {
       "GET /repos/{owner}/{repo}/contents/{path}": () => httpError(404),
       "GET /repos/{owner}/{repo}/pulls": [
         () => [],
-        () => [{ number: 77, state: "open", merged_at: null, html_url: "https://x/77", head: HAPPY_HEAD }],
+        () => [
+          {
+            number: 77,
+            state: "open",
+            merged_at: null,
+            html_url: "https://x/77",
+            head: HAPPY_HEAD,
+          },
+        ],
       ],
       "GET /repos/{owner}/{repo}/git/ref/heads/{branch}": () => ({ object: { sha: "abc" } }),
       "POST /repos/{owner}/{repo}/git/refs": () => ({}),
@@ -314,7 +360,12 @@ describe("onboarding/onboardRepo — all branches", () => {
       defaultBranchHint: "main",
       octokitFactory: async () => mock,
     });
-    expect(outcome).toEqual({ status: "permission_denied", owner: "acme", repo: "widgets", step: "create_pr" });
+    expect(outcome).toEqual({
+      status: "permission_denied",
+      owner: "acme",
+      repo: "widgets",
+      step: "create_pr",
+    });
   });
 
   it("GET /repos returns 500 → failed/get_repo with err_message", async () => {
@@ -355,7 +406,9 @@ describe("onboarding/onboardRepo — all branches", () => {
       "POST /repos/{owner}/{repo}/pulls": () => ({ number: 99, html_url: "u" }),
     });
     await onboardRepo({ ...baseArgs, defaultBranchHint: "main", octokitFactory: async () => mock });
-    const created = infoSpy.mock.calls.find((c) => (c[0] as { event?: string }).event === "onboard_pr_created");
+    const created = infoSpy.mock.calls.find(
+      (c) => (c[0] as { event?: string }).event === "onboard_pr_created",
+    );
     expect(created).toBeDefined();
     expect(created?.[0]).toMatchObject({
       event: "onboard_pr_created",

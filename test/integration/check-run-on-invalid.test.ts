@@ -68,7 +68,13 @@ afterAll(() => server.close());
 
 describe("Check Run on invalid config", () => {
   it("creates a Check Run with failure on YAML syntax error", async () => {
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-bad-yaml", installation_id: 0 });
+    const result = await loadConfig({
+      octokit,
+      owner: "o",
+      repo: "r",
+      sha: "sha-bad-yaml",
+      installation_id: 0,
+    });
 
     expect(result.config).toBeUndefined();
     expect(result.errors.length).toBeGreaterThan(0);
@@ -85,7 +91,13 @@ describe("Check Run on invalid config", () => {
   });
 
   it("creates a Check Run with failure on zod validation error", async () => {
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-bad-zod", installation_id: 0 });
+    const result = await loadConfig({
+      octokit,
+      owner: "o",
+      repo: "r",
+      sha: "sha-bad-zod",
+      installation_id: 0,
+    });
 
     expect(result.config).toBeUndefined();
     expect(result.errors.length).toBeGreaterThan(0);

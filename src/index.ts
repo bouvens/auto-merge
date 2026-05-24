@@ -17,9 +17,9 @@ import { isOnboarding } from "./onboarding/suppressionSet.js";
 import { getInstallationOctokitWithRetry } from "./onboarding/tokenRetry.js";
 import { buildServer } from "./server.js";
 import {
+  type CredentialsStore,
   checkStaleOnBoot,
   createCredentialsStore,
-  type CredentialsStore,
 } from "./setup/credentials.js";
 import { makeShutdown } from "./shutdown.js";
 import { dedup } from "./webhook/dedup.js";

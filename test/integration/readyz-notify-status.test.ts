@@ -2,10 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
-import {
-  createNotifyHealthChecker,
-  type NotifyStatus,
-} from "../../src/notify/healthCheck.js";
+import { createNotifyHealthChecker, type NotifyStatus } from "../../src/notify/healthCheck.js";
 import { buildServer } from "../../src/server.js";
 import { createHealthCheckHarness } from "../helpers/msw-healthcheck.js";
 
@@ -41,10 +38,7 @@ function makeEnv(overrides: Partial<Env>): Env {
 }
 
 // Mirrors src/index.ts wiring so test coverage is independent of boot-script structure.
-function makeWrappedReadyz(
-  env: Env,
-  checker: ReturnType<typeof createNotifyHealthChecker>,
-) {
+function makeWrappedReadyz(env: Env, checker: ReturnType<typeof createNotifyHealthChecker>) {
   const notifyHealthy = (s: NotifyStatus): boolean => s === "ok" || s === "n/a";
   return async (): Promise<{
     ok: boolean;

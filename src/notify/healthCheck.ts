@@ -74,8 +74,8 @@ export function createNotifyHealthChecker(env: {
         ? probeTelegram(env.TELEGRAM_BOT_TOKEN, PROBE_TIMEOUT_MS)
         : Promise.resolve<NotifyStatus>("n/a");
       const settled = await Promise.allSettled([slackP, tgP]);
-      const [slack, telegram] = settled.map((r): NotifyStatus =>
-        r.status === "fulfilled" ? r.value : "unreachable",
+      const [slack, telegram] = settled.map(
+        (r): NotifyStatus => (r.status === "fulfilled" ? r.value : "unreachable"),
       ) as [NotifyStatus, NotifyStatus];
       const expiresAt = Date.now() + ttl;
       cache.slack = {

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Octokit } from "@octokit/core";
+import { describe, expect, it, vi } from "vitest";
 import { protectionCheck } from "../../src/cascade/protectionCheck.js";
 
 function makeDeps(requestFn: ReturnType<typeof vi.fn>) {

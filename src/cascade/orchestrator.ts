@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getBotIdentity, getInstallationOctokit } from "../auth.js";
-import type { Config } from "../config/schema.js";
 import { loadConfig } from "../config/loader.js";
+import type { Config } from "../config/schema.js";
 import { log } from "../log.js";
 import type { NotificationChannel } from "../notify/channel.js";
 import type { Handler, Job } from "../webhook/queue.js";
@@ -65,7 +65,14 @@ async function resolveJobContext(
   }
 
   const { owner, repo } = payload;
-  const { config } = await loadConfig({ octokit, owner, repo, sha: "HEAD", installation_id: payload.installation_id, notify });
+  const { config } = await loadConfig({
+    octokit,
+    owner,
+    repo,
+    sha: "HEAD",
+    installation_id: payload.installation_id,
+    notify,
+  });
   if (!config) {
     log.warn({ ...baseLog, event: "cascade_failed_config_invalid" }, "cascade");
     return null;
@@ -88,7 +95,12 @@ async function resolveJobContext(
   const dedupKey = `${owner}/${repo}@${resolvedSha}`;
   if (sourceShaDedup.seen(dedupKey)) {
     log.info(
-      { ...baseLog, source_sha: resolvedSha, source: payload.source, event: "cascade_skipped_dedup" },
+      {
+        ...baseLog,
+        source_sha: resolvedSha,
+        source: payload.source,
+        event: "cascade_skipped_dedup",
+      },
       "cascade",
     );
     return null;

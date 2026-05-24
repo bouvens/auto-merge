@@ -4,11 +4,11 @@ vi.mock("../../src/cascade/sourceShaDedup.js", () => ({
   sourceShaDedup: { seen: vi.fn(), mark: vi.fn() },
 }));
 
-import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
+import { sourceShaDedup } from "../../src/cascade/sourceShaDedup.js";
+import { handleDispatchEvent } from "../../src/dispatch/handler.js";
 import { log } from "../../src/log.js";
 import type { MultiQueue } from "../../src/webhook/multiQueue.js";
-import { handleDispatchEvent } from "../../src/dispatch/handler.js";
 
 function makeQueue(): MultiQueue<CascadeJob> & {
   calls: Array<{ key: string; id: string; payload: unknown }>;
@@ -106,10 +106,7 @@ describe("handleDispatchEvent (D-09, D-10)", () => {
   it("loop-prevention NOT applied: bot sender → cascade still enqueued", async () => {
     // Push handler would skip on bot sender; dispatch handler must not (D-10 exemption).
     const q = makeQueue();
-    await handleDispatchEvent(
-      makeCtx({ sender: { login: "my-app[bot]" } }),
-      { queue: q },
-    );
+    await handleDispatchEvent(makeCtx({ sender: { login: "my-app[bot]" } }), { queue: q });
     expect(q.calls).toHaveLength(1);
     expect((q.calls[0]!.payload as { source: string }).source).toBe("dispatch");
   });

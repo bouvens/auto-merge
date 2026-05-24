@@ -33,7 +33,7 @@ describe("setup/html.escapeHtml", () => {
 });
 
 describe("setup/html.jsonForHtmlAttr", () => {
-  it("escapes embedded double quotes so result can be wrapped in value=\"...\"", () => {
+  it('escapes embedded double quotes so result can be wrapped in value="..."', () => {
     const out = jsonForHtmlAttr({ x: '"y"' });
     expect(out).not.toContain('"y"');
     expect(out).toContain("&quot;");

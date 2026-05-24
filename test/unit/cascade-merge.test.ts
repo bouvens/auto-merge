@@ -1,8 +1,8 @@
 import type { Octokit } from "@octokit/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as checkRunModule from "../../src/cascade/checkRun.js";
-import * as protectionCheckModule from "../../src/cascade/protectionCheck.js";
 import { mergeStep } from "../../src/cascade/merge.js";
+import * as protectionCheckModule from "../../src/cascade/protectionCheck.js";
 import { log } from "../../src/log.js";
 
 // Stub protectionCheck so existing tests' request mocks don't need to handle the protection endpoint.
@@ -352,7 +352,9 @@ describe("mergeStep", () => {
     });
     // protection_blocked must skip merge attempt and in_progress Check Run
     expect(createInProgressSpy).not.toHaveBeenCalled();
-    const mergeCalls = request.mock.calls.filter(([r]) => r === "POST /repos/{owner}/{repo}/merges");
+    const mergeCalls = request.mock.calls.filter(
+      ([r]) => r === "POST /repos/{owner}/{repo}/merges",
+    );
     expect(mergeCalls).toHaveLength(0);
   });
 

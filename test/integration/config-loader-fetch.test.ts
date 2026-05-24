@@ -39,7 +39,13 @@ afterAll(() => server.close());
 
 describe("loadConfig — GitHub Contents API fetch", () => {
   it("fetches and parses a valid config", async () => {
-    const result = await loadConfig({ octokit, owner: "o", repo: "r", sha: "sha-fetch-01", installation_id: 0 });
+    const result = await loadConfig({
+      octokit,
+      owner: "o",
+      repo: "r",
+      sha: "sha-fetch-01",
+      installation_id: 0,
+    });
     expect(result.errors).toHaveLength(0);
     expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
     expect(result.source).toBe("repo");

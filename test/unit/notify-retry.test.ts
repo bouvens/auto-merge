@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpError, withRetry } from "../../src/notify/retry.js";
 import type { RetryOpts } from "../../src/notify/retry.js";
+import { HttpError, withRetry } from "../../src/notify/retry.js";
 
 const defaultOpts: RetryOpts = {
   attempts: 3,

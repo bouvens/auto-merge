@@ -1,5 +1,5 @@
 // Shared msw harness for Slack/Telegram notification channel tests.
-import { HttpResponse, http, type HttpHandler } from "msw";
+import { type HttpHandler, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
 export interface SlackCall {
@@ -29,7 +29,12 @@ export function createNotifyHarness(): NotifyHarness {
   const defaultSlackHandler = http.post(
     "https://hooks.slack.com/services/:rest+",
     async ({ request }) => {
-      slackCalls.push({ body: await request.clone().json().catch(() => null) });
+      slackCalls.push({
+        body: await request
+          .clone()
+          .json()
+          .catch(() => null),
+      });
       return new HttpResponse("ok", {
         status: 200,
         headers: { "Content-Type": "text/plain" },
@@ -41,7 +46,12 @@ export function createNotifyHarness(): NotifyHarness {
   const defaultTelegramHandler = http.post(
     "https://api.telegram.org/bot*/sendMessage",
     async ({ request }) => {
-      telegramCalls.push({ body: await request.clone().json().catch(() => null) });
+      telegramCalls.push({
+        body: await request
+          .clone()
+          .json()
+          .catch(() => null),
+      });
       return HttpResponse.json({ ok: true, result: { message_id: 1 } });
     },
   );
@@ -61,7 +71,12 @@ export function createNotifyHarness(): NotifyHarness {
     },
     setSlackResponse(status, body = "", headers = {}) {
       slackOverride = http.post("https://hooks.slack.com/services/:rest+", async ({ request }) => {
-        slackCalls.push({ body: await request.clone().json().catch(() => null) });
+        slackCalls.push({
+          body: await request
+            .clone()
+            .json()
+            .catch(() => null),
+        });
         return new HttpResponse(body, {
           status,
           headers: { "Content-Type": "text/plain", ...headers },
@@ -73,7 +88,12 @@ export function createNotifyHarness(): NotifyHarness {
       telegramOverride = http.post(
         "https://api.telegram.org/bot*/sendMessage",
         async ({ request }) => {
-          telegramCalls.push({ body: await request.clone().json().catch(() => null) });
+          telegramCalls.push({
+            body: await request
+              .clone()
+              .json()
+              .catch(() => null),
+          });
           return HttpResponse.json(json, { status });
         },
       );

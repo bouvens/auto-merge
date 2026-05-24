@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapError, type Endpoint } from "../../src/cascade/errorMap.js";
+import { type Endpoint, mapError } from "../../src/cascade/errorMap.js";
 
 describe("mapError", () => {
   describe("returns null for status not in {403, 404}", () => {

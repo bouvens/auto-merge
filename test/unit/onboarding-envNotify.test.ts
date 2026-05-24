@@ -1,8 +1,8 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { notifySlackEnv, notifyTelegramEnv } from "../../src/onboarding/envNotify.js";
 import { log } from "../../src/log.js";
+import { notifySlackEnv, notifyTelegramEnv } from "../../src/onboarding/envNotify.js";
 
 const SLACK_URL = "https://hooks.slack.com/services/T000/B000/xxx";
 const TG_TOKEN = "1234567890:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -86,10 +86,7 @@ describe("notifySlackEnv", () => {
 describe("notifyTelegramEnv", () => {
   it("no-op when TELEGRAM_BOT_TOKEN undefined", async () => {
     const warnSpy = vi.spyOn(log, "warn").mockImplementation(() => undefined);
-    await notifyTelegramEnv(
-      { env: { ...envBase(), TELEGRAM_DEFAULT_CHAT_ID: TG_CHAT } },
-      "msg",
-    );
+    await notifyTelegramEnv({ env: { ...envBase(), TELEGRAM_DEFAULT_CHAT_ID: TG_CHAT } }, "msg");
     expect(captured).toHaveLength(0);
     expect(warnSpy).not.toHaveBeenCalled();
   });

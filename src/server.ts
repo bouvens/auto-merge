@@ -59,9 +59,7 @@ export async function buildServer(deps: BuildServerDeps) {
     const result = await deps.readyzFn();
 
     if (!result.ok) {
-      return reply
-        .code(503)
-        .send({ status: "not-ready", reason: result.reason, ...result.body });
+      return reply.code(503).send({ status: "not-ready", reason: result.reason, ...result.body });
     }
 
     return { status: "ready", ...result.body };
@@ -122,10 +120,7 @@ export async function buildServer(deps: BuildServerDeps) {
       });
     } else {
       // Defence in depth — boot wiring (src/index.ts) is the source of truth for the flag/store invariant.
-      deps.log.warn(
-        { event: "setup_routes_skipped_missing_credentials" },
-        "setup",
-      );
+      deps.log.warn({ event: "setup_routes_skipped_missing_credentials" }, "setup");
     }
   }
 

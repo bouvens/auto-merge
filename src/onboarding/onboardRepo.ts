@@ -1,6 +1,6 @@
 import type { Octokit } from "@octokit/core";
 import { log } from "../log.js";
-import { DISPATCH_WORKFLOW_YML, buildPrBody, buildYmlConfig } from "./templates.js";
+import { buildPrBody, buildYmlConfig, DISPATCH_WORKFLOW_YML } from "./templates.js";
 
 const ONBOARDING_BRANCH = "auto-merge/onboarding";
 const YML_PATH = ".github/auto-merge.yml";
@@ -8,7 +8,12 @@ const WORKFLOW_PATH = ".github/workflows/auto-merge-dispatch.yml";
 
 export type OnboardOutcome =
   | { status: "created"; owner: string; repo: string; pr_number: number; pr_url: string }
-  | { status: "skipped"; owner: string; repo: string; reason: "config_exists" | "pr_open" | "pr_declined" }
+  | {
+      status: "skipped";
+      owner: string;
+      repo: string;
+      reason: "config_exists" | "pr_open" | "pr_declined";
+    }
   | { status: "protection_blocked"; owner: string; repo: string }
   | { status: "permission_denied"; owner: string; repo: string; step: string }
   | { status: "token_mint_failed"; owner: string; repo: string }
@@ -63,7 +68,10 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
     } catch (err) {
       const status = errStatus(err);
       if (status === 403) {
-        log.warn({ ...logBase, event: "onboard_permission_denied", step: "get_repo" }, "onboarding");
+        log.warn(
+          { ...logBase, event: "onboard_permission_denied", step: "get_repo" },
+          "onboarding",
+        );
         return { status: "permission_denied", owner, repo, step: "get_repo" };
       }
       log.warn(
@@ -86,7 +94,10 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
   } catch (err) {
     const status = errStatus(err);
     if (status === 403) {
-      log.warn({ ...logBase, event: "onboard_permission_denied", step: "get_contents" }, "onboarding");
+      log.warn(
+        { ...logBase, event: "onboard_permission_denied", step: "get_contents" },
+        "onboarding",
+      );
       return { status: "permission_denied", owner, repo, step: "get_contents" };
     }
     if (status !== 404) {
@@ -113,13 +124,19 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
         log.info({ ...logBase, event: "onboard_skipped_pr_open", pr: match.number }, "onboarding");
         return { status: "skipped", owner, repo, reason: "pr_open" };
       }
-      log.info({ ...logBase, event: "onboard_skipped_pr_declined", pr: match.number }, "onboarding");
+      log.info(
+        { ...logBase, event: "onboard_skipped_pr_declined", pr: match.number },
+        "onboarding",
+      );
       return { status: "skipped", owner, repo, reason: "pr_declined" };
     }
   } catch (err) {
     const status = errStatus(err);
     if (status === 403) {
-      log.warn({ ...logBase, event: "onboard_permission_denied", step: "list_pulls" }, "onboarding");
+      log.warn(
+        { ...logBase, event: "onboard_permission_denied", step: "list_pulls" },
+        "onboarding",
+      );
       return { status: "permission_denied", owner, repo, step: "list_pulls" };
     }
     log.warn(
@@ -140,7 +157,10 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
   } catch (err) {
     const status = errStatus(err);
     if (status === 403) {
-      log.warn({ ...logBase, event: "onboard_permission_denied", step: "get_base_ref" }, "onboarding");
+      log.warn(
+        { ...logBase, event: "onboard_permission_denied", step: "get_base_ref" },
+        "onboarding",
+      );
       return { status: "permission_denied", owner, repo, step: "get_base_ref" };
     }
     log.warn(
@@ -171,10 +191,22 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
       } catch (probe) {
         if (errStatus(probe) !== 404) {
           log.warn(
-            { ...logBase, event: "onboard_failed", step: "probe_ref", status: errStatus(probe), msg: errMessage(probe) },
+            {
+              ...logBase,
+              event: "onboard_failed",
+              step: "probe_ref",
+              status: errStatus(probe),
+              msg: errMessage(probe),
+            },
             "onboarding",
           );
-          return { status: "failed", owner, repo, step: "probe_ref", err_message: errMessage(probe) };
+          return {
+            status: "failed",
+            owner,
+            repo,
+            step: "probe_ref",
+            err_message: errMessage(probe),
+          };
         }
       }
       if (!branchExists) {
@@ -182,7 +214,10 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
         return { status: "protection_blocked", owner, repo };
       }
     } else if (status === 403) {
-      log.warn({ ...logBase, event: "onboard_permission_denied", step: "create_ref" }, "onboarding");
+      log.warn(
+        { ...logBase, event: "onboard_permission_denied", step: "create_ref" },
+        "onboarding",
+      );
       return { status: "permission_denied", owner, repo, step: "create_ref" };
     } else {
       log.warn(
@@ -204,7 +239,12 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
     return { status: "failed", owner, repo, step: "build_yml", err_message: errMessage(err) };
   }
 
-  async function putFileIdempotent(path: string, content: string, message: string, step: string): Promise<OnboardOutcome | null> {
+  async function putFileIdempotent(
+    path: string,
+    content: string,
+    message: string,
+    step: string,
+  ): Promise<OnboardOutcome | null> {
     try {
       await octokit!.request("PUT /repos/{owner}/{repo}/contents/{path}", {
         owner,
@@ -261,7 +301,12 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
     }
   }
 
-  const ymlOutcome = await putFileIdempotent(YML_PATH, ymlContent, "auto-merge: add cascade config", "put_yml");
+  const ymlOutcome = await putFileIdempotent(
+    YML_PATH,
+    ymlContent,
+    "auto-merge: add cascade config",
+    "put_yml",
+  );
   if (ymlOutcome) return ymlOutcome;
 
   const wfOutcome = await putFileIdempotent(
@@ -311,14 +356,32 @@ export async function onboardRepo(args: OnboardArgs): Promise<OnboardOutcome> {
         const match = items.find((p) => p.head?.ref === ONBOARDING_BRANCH);
         if (match) {
           log.info({ ...logBase, event: "onboard_pr_recovered", pr: match.number }, "onboarding");
-          return { status: "created", owner, repo, pr_number: match.number, pr_url: match.html_url };
+          return {
+            status: "created",
+            owner,
+            repo,
+            pr_number: match.number,
+            pr_url: match.html_url,
+          };
         }
       } catch (probe) {
         log.warn(
-          { ...logBase, event: "onboard_failed", step: "create_pr_recover", status: errStatus(probe), msg: errMessage(probe) },
+          {
+            ...logBase,
+            event: "onboard_failed",
+            step: "create_pr_recover",
+            status: errStatus(probe),
+            msg: errMessage(probe),
+          },
           "onboarding",
         );
-        return { status: "failed", owner, repo, step: "create_pr_recover", err_message: errMessage(probe) };
+        return {
+          status: "failed",
+          owner,
+          repo,
+          step: "create_pr_recover",
+          err_message: errMessage(probe),
+        };
       }
     }
     log.warn(

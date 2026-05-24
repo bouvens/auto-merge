@@ -2,7 +2,7 @@ import type { Octokit } from "@octokit/core";
 import type { Env } from "../env.js";
 import { log } from "../log.js";
 import { notifySlackEnv, notifyTelegramEnv } from "./envNotify.js";
-import { onboardRepo, type OnboardArgs, type OnboardOutcome } from "./onboardRepo.js";
+import { type OnboardArgs, type OnboardOutcome, onboardRepo } from "./onboardRepo.js";
 import pLimit from "./pLimit.js";
 import { markOnboarding } from "./suppressionSet.js";
 
@@ -11,7 +11,11 @@ export interface OnboardingHandlerDeps {
   multiQueue: { clearByInstallation(id: number): number };
   env: Pick<
     Env,
-    "SLACK_WEBHOOK_URL" | "TELEGRAM_BOT_TOKEN" | "TELEGRAM_DEFAULT_CHAT_ID" | "NOTIFY_TIMEOUT_MS" | "SETUP_PUBLIC_URL"
+    | "SLACK_WEBHOOK_URL"
+    | "TELEGRAM_BOT_TOKEN"
+    | "TELEGRAM_DEFAULT_CHAT_ID"
+    | "NOTIFY_TIMEOUT_MS"
+    | "SETUP_PUBLIC_URL"
   >;
 }
 
@@ -37,7 +41,10 @@ interface SenderShape {
   type?: string;
 }
 
-function extractRepos(payload: unknown, fields: Array<"repositories" | "repositories_added">): RepoRef[] {
+function extractRepos(
+  payload: unknown,
+  fields: Array<"repositories" | "repositories_added">,
+): RepoRef[] {
   const p = payload as Record<string, unknown> | null;
   if (!p) return [];
   let raw: unknown;
@@ -77,11 +84,17 @@ function extractInstallationId(payload: unknown): number | undefined {
 }
 
 function extractRepositorySelection(payload: unknown): string | undefined {
-  const p = payload as { repository_selection?: string; installation?: { repository_selection?: string } } | null;
+  const p = payload as {
+    repository_selection?: string;
+    installation?: { repository_selection?: string };
+  } | null;
   return p?.repository_selection ?? p?.installation?.repository_selection;
 }
 
-function buildAggregateSummaryText(outcomes: OnboardOutcome[], installationId: number): string | null {
+function buildAggregateSummaryText(
+  outcomes: OnboardOutcome[],
+  installationId: number,
+): string | null {
   const bad = outcomes.filter((o) => o.status === "protection_blocked" || o.status === "failed");
   if (bad.length === 0) return null;
   const lines = bad.map((o) => {
@@ -92,7 +105,11 @@ function buildAggregateSummaryText(outcomes: OnboardOutcome[], installationId: n
 }
 
 export function createOnboardingHandlers(deps: OnboardingHandlerDeps): OnboardingHandlers {
-  async function runBatch(installationId: number, repos: RepoRef[], senderLogin: string | undefined): Promise<void> {
+  async function runBatch(
+    installationId: number,
+    repos: RepoRef[],
+    senderLogin: string | undefined,
+  ): Promise<void> {
     // D-03: per-batch semaphore — each webhook delivery owns its own concurrency budget.
     const limit = pLimit(2);
 
@@ -134,7 +151,12 @@ export function createOnboardingHandlers(deps: OnboardingHandlerDeps): Onboardin
       if (o.status === "created") created++;
       else if (o.status === "skipped") skipped++;
       else if (o.status === "protection_blocked") blocked++;
-      else if (o.status === "failed" || o.status === "permission_denied" || o.status === "token_mint_failed") failed++;
+      else if (
+        o.status === "failed" ||
+        o.status === "permission_denied" ||
+        o.status === "token_mint_failed"
+      )
+        failed++;
     }
     log.info(
       {
@@ -184,7 +206,10 @@ export function createOnboardingHandlers(deps: OnboardingHandlerDeps): Onboardin
 
       // D-04: return immediately; Probot must ACK within 10s and bulk-install batch can take minutes.
       void runBatch(installationId, repos, senderLogin).catch((err) =>
-        log.error({ err, installation_id: installationId, event: "onboard_batch_unhandled" }, "onboarding"),
+        log.error(
+          { err, installation_id: installationId, event: "onboard_batch_unhandled" },
+          "onboarding",
+        ),
       );
     },
 
@@ -206,7 +231,10 @@ export function createOnboardingHandlers(deps: OnboardingHandlerDeps): Onboardin
 
       // D-04: return immediately; Probot must ACK within 10s and bulk-install batch can take minutes.
       void runBatch(installationId, repos, senderLogin).catch((err) =>
-        log.error({ err, installation_id: installationId, event: "onboard_batch_unhandled" }, "onboarding"),
+        log.error(
+          { err, installation_id: installationId, event: "onboard_batch_unhandled" },
+          "onboarding",
+        ),
       );
     },
 

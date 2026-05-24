@@ -102,10 +102,7 @@ const HTML_HEADERS = {
   cacheControl: "no-store, must-revalidate",
 } as const;
 
-export function registerManifestFormRoute(
-  app: FastifyInstance,
-  deps: ManifestFormDeps,
-): void {
+export function registerManifestFormRoute(app: FastifyInstance, deps: ManifestFormDeps): void {
   app.get("/setup/new", async (req, reply) => {
     const query = (req.query ?? {}) as ManifestFormQuery;
 

@@ -1,11 +1,11 @@
 // Integration tests for the full notify pipeline: MultiChannel → SlackChannel/TelegramChannel → msw-mocked HTTP.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createNotifyHarness } from "../helpers/msw-notify.js";
+import type { Config } from "../../src/config/schema.js";
+import type { NotificationChannel } from "../../src/notify/channel.js";
 import { MultiChannel } from "../../src/notify/dispatcher.js";
 import { SlackChannel } from "../../src/notify/slack.js";
 import { TelegramChannel } from "../../src/notify/telegram.js";
-import type { NotificationChannel } from "../../src/notify/channel.js";
-import type { Config } from "../../src/config/schema.js";
+import { createNotifyHarness } from "../helpers/msw-notify.js";
 
 // Stub env — no real process.env reads.
 const stubEnv = {
