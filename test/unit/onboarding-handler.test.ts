@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { log } from "../../src/log.js";
 import * as envNotifyMod from "../../src/onboarding/envNotify.js";
-import { createOnboardingHandlers } from "../../src/onboarding/handler.js";
+import {
+  createOnboardingHandlers,
+  type OnboardingHandlerDeps,
+} from "../../src/onboarding/handler.js";
 import * as onboardRepoMod from "../../src/onboarding/onboardRepo.js";
 import type { OnboardOutcome } from "../../src/onboarding/onboardRepo.js";
 import * as suppressionMod from "../../src/onboarding/suppressionSet.js";
@@ -17,18 +20,16 @@ vi.mock("../../src/onboarding/suppressionSet.js", () => ({
   markOnboarding: vi.fn(),
 }));
 
-function buildDeps(overrides: Record<string, unknown> = {}): {
-  octokitFactory: ReturnType<typeof vi.fn>;
-  multiQueue: { clearByInstallation: ReturnType<typeof vi.fn> };
-  env: {
-    SLACK_WEBHOOK_URL: string;
-    TELEGRAM_BOT_TOKEN: string;
-    TELEGRAM_DEFAULT_CHAT_ID: string;
-    NOTIFY_TIMEOUT_MS: number;
-    SETUP_PUBLIC_URL: string;
+type TestDeps = OnboardingHandlerDeps & {
+  multiQueue: OnboardingHandlerDeps["multiQueue"] & {
+    clearByInstallation: ReturnType<typeof vi.fn>;
   };
-} {
-  const multiQueue = { clearByInstallation: vi.fn(() => 0) };
+  octokitFactory: OnboardingHandlerDeps["octokitFactory"] & { mock: { calls: unknown[][] } };
+};
+
+function buildDeps(overrides: Record<string, unknown> = {}): TestDeps {
+  const clearByInstallation = vi.fn(() => 0);
+  const multiQueue = { clearByInstallation } as unknown as TestDeps["multiQueue"];
   const env = {
     SLACK_WEBHOOK_URL: "https://hooks.slack.com/x",
     TELEGRAM_BOT_TOKEN: "test_token_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -36,8 +37,8 @@ function buildDeps(overrides: Record<string, unknown> = {}): {
     NOTIFY_TIMEOUT_MS: 5000,
     SETUP_PUBLIC_URL: "https://app.example.com",
     ...overrides,
-  };
-  const octokitFactory = vi.fn(async () => ({}) as never);
+  } as OnboardingHandlerDeps["env"];
+  const octokitFactory = vi.fn(async (_id: number) => undefined) as unknown as TestDeps["octokitFactory"];
   return { octokitFactory, multiQueue, env };
 }
 
@@ -212,7 +213,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     await flushAll();
     expect(vi.mocked(envNotifyMod.notifySlackEnv)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(envNotifyMod.notifyTelegramEnv)).toHaveBeenCalledTimes(1);
-    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0][1] as string;
+    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0]![1] as string;
     expect(text).toContain("o/rbad");
     expect(text).toContain("protection_blocked");
   });
@@ -236,7 +237,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
       ]),
     });
     await flushAll();
-    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0][1] as string;
+    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0]![1] as string;
     expect(text).toContain("o/rblock");
     expect(text).toContain("o/rfail");
     expect(text).toContain("protection_blocked");
@@ -285,7 +286,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
       }),
     });
     await flushAll();
-    expect(vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0][0].senderLogin).toBe("alice");
+    expect(vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0]![0].senderLogin).toBe("alice");
   });
 
   it("filters sender when sender.type === 'Bot' — senderLogin must be undefined", async () => {
@@ -297,7 +298,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
       }),
     });
     await flushAll();
-    expect(vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0][0].senderLogin).toBeUndefined();
+    expect(vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0]![0].senderLogin).toBeUndefined();
   });
 
   it("swallows an onboardRepo rejection and surfaces a synthetic failed entry in the summary", async () => {
@@ -315,7 +316,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
     });
     await flushAll();
     expect(vi.mocked(envNotifyMod.notifySlackEnv)).toHaveBeenCalledTimes(1);
-    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0][1] as string;
+    const text = vi.mocked(envNotifyMod.notifySlackEnv).mock.calls[0]![1] as string;
     expect(text).toContain("o/boom");
   });
 
@@ -331,7 +332,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
         typeof c[0] === "object" && c[0] !== null && (c[0] as { event?: string }).event === "onboard_installation_cleaned",
     );
     expect(evLog).toBeDefined();
-    expect((evLog?.[0] as { lanes_dropped: number }).lanes_dropped).toBe(3);
+    expect(((evLog as unknown[])[0] as { lanes_dropped: number }).lanes_dropped).toBe(3);
     expect(deps.octokitFactory).not.toHaveBeenCalled();
     infoSpy.mockRestore();
   });
@@ -347,7 +348,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
         typeof c[0] === "object" && c[0] !== null && (c[0] as { event?: string }).event === "onboard_installation_cleaned",
     );
     expect(evLog).toBeDefined();
-    expect((evLog?.[0] as { lanes_dropped: number }).lanes_dropped).toBe(0);
+    expect(((evLog as unknown[])[0] as { lanes_dropped: number }).lanes_dropped).toBe(0);
     infoSpy.mockRestore();
   });
 
@@ -358,7 +359,7 @@ describe("onboarding/handler — createOnboardingHandlers", () => {
       payload: makeInstallationPayload(1, [{ owner: "o", name: "r1" }]),
     });
     await flushAll();
-    const callArg = vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0][0] as { octokitFactory: unknown };
+    const callArg = vi.mocked(onboardRepoMod.onboardRepo).mock.calls[0]![0] as { octokitFactory: unknown };
     expect(callArg.octokitFactory).toBe(deps.octokitFactory);
   });
 
