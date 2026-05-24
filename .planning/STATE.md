@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T09:55:20.543Z"
+last_updated: "2026-05-24T15:10:00.000Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 24
-  completed_plans: 23
-  percent: 50
+  completed_plans: 24
+  percent: 67
 ---
 
 # State: auto-merge
@@ -25,9 +25,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 ## Current Position
 
-Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
-Plan: 10 of 10
-Status: Ready to execute
+Phase: 09 (onboarding-webhook-pr-bot) — READY FOR VERIFIER
+Plan: 10 of 10 — completed
+Status: All plans shipped; integration test green (614/614)
 Last activity: 2026-05-24
 
 ## Last Milestone
@@ -56,9 +56,9 @@ Last activity: 2026-05-24
 
 ## Session Continuity
 
-**Last action:** Plan 09-08 shipped — `createOnboardingHandlers(deps)` factory: per-batch pLimit(2) (D-03), fire-and-forget (D-04), aggregate env-summary on bad outcomes, octokitFactory injection (D-29). External `p-limit` dependency replaced by ~25-LOC in-tree helper at `src/onboarding/pLimit.ts` to eliminate supply-chain risk. 21 new unit tests; full suite 610/610 green.
+**Last action:** Plan 09-10 shipped — msw-driven end-to-end integration test (`test/integration/onboarding-bulk-install.test.ts`, 455 LOC) covers SC1 (draft PR per repo), SC2 (bulk 80 repos + p-limit(2) + 0 user notify), SC3 (closed-no-merge idempotency), SC4 (protection-block → ONE aggregate env Slack/Telegram, NO Issue), SC5 (installation.deleted → 0 GitHub API calls). Full suite 614/614 green; lint:fix exit 0; pre-existing TS2352 in `onboarding-onboardRepo.test.ts` already in deferred-items.md.
 
-**Next action:** Plan 09-09 — webhook wiring (mounting handlers + boot-time octokitFactory).
+**Next action:** Phase 9 verifier — confirm all 5 SCs covered + 8 ONBOARD-* requirements traceable.
 
 ---
 *State initialized: 2026-05-20*

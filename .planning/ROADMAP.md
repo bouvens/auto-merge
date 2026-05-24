@@ -27,7 +27,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [ ] **Phase 6: Foundation — env + notify healthCheck** — Boot-time notify probes + new env vars, `/readyz` extension, fail-fast format vs degraded connectivity
 - [x] **Phase 7: Config DEFAULT fallback** — `DEFAULT_CASCADE_CONFIG_FILE` + `DEFAULT_CASCADE_CONFIG_YAML` org-default with precedence (repo > file > env) and hot-reload for file path (completed 2026-05-23)
 - [ ] **Phase 8: App Manifest flow** — `/setup/new` + `/setup/callback` one-click GitHub App creation with CSRF state, persist-before-render, duplicate-setup guard
-- [ ] **Phase 9: Onboarding webhook + PR-bot** — `installation` / `installation_repositories` subscribers open idempotent draft PR with `.github/auto-merge.yml` + dispatch workflow, respect branch protection
+- [x] **Phase 9: Onboarding webhook + PR-bot** — `installation` / `installation_repositories` subscribers open idempotent draft PR with `.github/auto-merge.yml` + dispatch workflow, respect branch protection (completed 2026-05-24)
 - [ ] **Phase 10: Diagnose endpoint** — `GET /diagnose/{owner}/{repo}` with bearer-token auth, rate-limit, redaction; composes Phase 6/7/9 outputs
 - [ ] **Phase 11: Release artifacts** — Multi-arch GHCR image (matrix-per-arch + cosign keyless + SLSA provenance), Helm chart (single-replica guard, `existingSecretName`), Fly.io / Render / Compose+Caddy templates, README rewrite
 
@@ -101,7 +101,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] 09-07-PLAN.md — MultiChannel suppressionCheck option (additive ctor arg + queue_overflow key extraction)
 - [x] 09-08-PLAN.md — onboarding handler (p-limit batch + fire-and-forget + aggregate summary + p-limit install)
 - [x] 09-09-PLAN.md — wiring (webhook/handler signature + server.ts gate + index.ts boot)
-- [ ] 09-10-PLAN.md — integration test (SC1-SC5 end-to-end via msw + signed webhooks)
+- [x] 09-10-PLAN.md — integration test (SC1-SC5 end-to-end via msw + signed webhooks)
 
 ### Phase 10: Diagnose endpoint
 **Goal**: Оператор за один HTTP-вызов получает полный health-snapshot конкретного репо: permissions, config source, branch existence, protection, notify status — без чтения логов или ручных API-проб.
