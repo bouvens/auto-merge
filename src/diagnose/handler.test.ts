@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../env.js";
 import type { NotifyHealthChecker } from "../notify/healthCheck.js";
 import {
-  type DiagnoseDeps,
-  REQUIRED_PERMISSIONS,
   compareBearer,
+  type DiagnoseDeps,
   parseBearer,
+  REQUIRED_PERMISSIONS,
   registerDiagnoseRoute,
 } from "./handler.js";
 import type { DiagnoseChecks } from "./types.js";
