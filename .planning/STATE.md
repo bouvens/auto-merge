@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T12:04:17Z"
+last_updated: "2026-05-24T17:10:00Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 29
-  completed_plans: 26
-  percent: 70
+  completed_plans: 27
+  percent: 73
 ---
 
 # State: auto-merge
@@ -26,7 +26,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 10 (diagnose-endpoint) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -58,9 +58,9 @@ Last activity: 2026-05-24
 
 ## Session Continuity
 
-**Last action:** Plan 10-02 shipped — `src/diagnose/types.ts` (D-10 contracts) + `src/diagnose/probes.ts` (runProbes orchestrator: safeProbe wrapper, Promise.allSettled-style parallelism, per-call AbortSignal.timeout(3000), 404-is-data semantics, app-not-installed short-circuit returning full key-set as n/a) + `src/diagnose/probes.test.ts` (10 msw-driven scenarios). Full suite 634/634 green; biome clean; tsc clean (pre-existing TS2352 in `onboarding-onboardRepo.test.ts` still in deferred-items.md).
+**Last action:** Plan 10-03 shipped — `src/diagnose/markdown.ts` (`renderMarkdown(report)` pure function, STATUS_EMOJI object map, per-section H2 + bullet list, sorted permission/branch keys for snapshot determinism, conditional `open_pr` line, NotifyStatus→ProbeStatus bucket for emoji selection) + `src/diagnose/markdown.test.ts` (4 fixtures: all-green / app-not-installed / permission+branch gap / onboarding warn with PR) + committed `__snapshots__/markdown.test.ts.snap`. Suite 640/640 green; biome clean; tsc clean for new files (pre-existing TS2352 in `onboarding-onboardRepo.test.ts` still in deferred-items.md).
 
-**Next action:** Plan 10-03 — Markdown renderer for DiagnoseReport (pure function + snapshot tests).
+**Next action:** Plan 10-04 — Handler + route registration + server.ts/index.ts wiring (composes probes + markdown renderer behind bearer/rate-limit/503-gate).
 
 ---
 *State initialized: 2026-05-20*
