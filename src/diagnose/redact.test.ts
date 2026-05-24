@@ -7,9 +7,9 @@ describe("redactSlackUrl", () => {
   });
 
   it("masks the path segment after the last slash", () => {
-    expect(
-      redactSlackUrl("https://hooks.slack.com/services/T1/B1/abc123"),
-    ).toBe("https://hooks.slack.com/services/T1/B1/****");
+    expect(redactSlackUrl("https://hooks.slack.com/services/T1/B1/abc123")).toBe(
+      "https://hooks.slack.com/services/T1/B1/****",
+    );
   });
 
   it("still appends /**** when there is no trailing path segment", () => {
