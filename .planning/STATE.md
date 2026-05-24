@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T08:08:40.258Z"
-last_activity: 2026-05-24 -- 09-01 suppressionSet shipped
+last_updated: "2026-05-24T13:20:00.000Z"
+last_activity: 2026-05-24 -- 09-04 envNotify shipped
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 15
-  percent: 50
+  completed_plans: 17
+  percent: 54
 ---
 
 # State: auto-merge
@@ -26,9 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
-Plan: 2 of 10
+Plan: 4 of 10
 Status: Ready to execute
-Last activity: 2026-05-24 -- 09-01 suppressionSet shipped (2/2 tasks, 5/5 tests)
+Last activity: 2026-05-24 -- 09-04 envNotify shipped (3/3 tasks, 8/8 tests)
 
 ## Last Milestone
 

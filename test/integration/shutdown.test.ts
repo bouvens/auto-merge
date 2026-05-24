@@ -24,6 +24,7 @@ function makeQueue(opts: { neverDrain?: boolean }): MultiQueue<unknown> {
     enqueue: vi.fn(),
     size: vi.fn().mockReturnValue(0),
     keyCount: vi.fn().mockReturnValue(0),
+    clearByInstallation: vi.fn().mockReturnValue(0),
     drain: vi.fn().mockImplementation((_timeoutMs: number) => {
       if (!opts.neverDrain) return Promise.resolve();
       return new Promise<void>(() => {});
@@ -94,6 +95,7 @@ describe("drain timeout exits 0", () => {
       enqueue: vi.fn(),
       size: vi.fn().mockReturnValue(1),
       keyCount: vi.fn().mockReturnValue(1),
+      clearByInstallation: vi.fn().mockReturnValue(0),
       drain: vi.fn().mockImplementation((_timeoutMs: number) => {
         log.warn(
           { event: "multi_queue_drain_timeout", remaining_keys: ["inst/owner/repo"], remaining_total: 1, timeout_ms: _timeoutMs },

@@ -37,6 +37,7 @@ function makeQueue(): MultiQueue<CascadeJob> & {
     drain: async () => undefined,
     size: () => calls.length,
     keyCount: () => calls.length,
+    clearByInstallation: () => 0,
   };
 }
 

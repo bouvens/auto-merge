@@ -9,6 +9,7 @@ export interface MultiQueue<T> {
   drain(timeoutMs: number): Promise<void>;
   size(): number;
   keyCount(): number;
+  clearByInstallation(installationId: number): number;
 }
 
 interface Lane<T> {
@@ -135,6 +136,19 @@ export function createMultiQueue<T>(opts: MultiQueueOpts<T>): MultiQueue<T> {
 
     keyCount() {
       return lanes.size;
+    },
+
+    // Running lane is detached from the map but its in-flight job is not aborted.
+    clearByInstallation(installationId: number): number {
+      let count = 0;
+      const prefix = `${installationId}/`;
+      for (const key of [...lanes.keys()]) {
+        if (key.startsWith(prefix)) {
+          lanes.delete(key);
+          count++;
+        }
+      }
+      return count;
     },
   };
 }

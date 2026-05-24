@@ -55,6 +55,7 @@ function makeFakeMultiQueue(): MultiQueue<CascadeJob> & { calls: Array<{ key: st
     drain: vi.fn(async () => {}),
     size: vi.fn(() => calls.length),
     keyCount: vi.fn(() => 0),
+    clearByInstallation: vi.fn(() => 0),
   };
 }
 
