@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T17:10:00Z"
+last_updated: "2026-05-24T12:21:02.383Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 29
-  completed_plans: 27
-  percent: 73
+  completed_plans: 28
+  percent: 67
 ---
 
 # State: auto-merge
@@ -26,7 +26,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 10 (diagnose-endpoint) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -55,12 +55,14 @@ Last activity: 2026-05-24
 - v1.0 components FROZEN: cascade/, MultiQueue, pushHandler, dispatch, notify dispatcher, cron safetyNet, shutdown, config/schema.ts.
 - Plan 10-02: `requiredPermissions` injected as `runProbes` dependency (not imported from handler) — keeps `probes.ts` free of forward-imports; handler keeps canonical constant per D-15.
 - Plan 10-02: MSW handler ordering rule — base handlers via one `server.use(...happy)` call, per-test overrides via a second `server.use(override)` call; spreading both into a single `server.use()` resolves the first-in-array as winner and silently breaks override intent.
+- Plan 10-04: `healthChecker` + octokit factories made MANDATORY on `BuildServerDeps` (D-18) — diagnose route registers unconditionally so the 503-gate inside the handler is the single source of "disabled" state. Pre-existing tests use `test/helpers/diagnose-deps.ts` stub. Making the deps optional would silently disable diagnose in production.
+- Plan 10-04: Fastify constructed with `trustProxy: true` (D-20) — required for `req.ip` to honour `X-Forwarded-For` behind Caddy/k8s ingress so per-IP rate-limit keys on the real client. Without trustProxy, all rate-limit traffic shares the proxy socket address as its key.
 
 ## Session Continuity
 
-**Last action:** Plan 10-03 shipped — `src/diagnose/markdown.ts` (`renderMarkdown(report)` pure function, STATUS_EMOJI object map, per-section H2 + bullet list, sorted permission/branch keys for snapshot determinism, conditional `open_pr` line, NotifyStatus→ProbeStatus bucket for emoji selection) + `src/diagnose/markdown.test.ts` (4 fixtures: all-green / app-not-installed / permission+branch gap / onboarding warn with PR) + committed `__snapshots__/markdown.test.ts.snap`. Suite 640/640 green; biome clean; tsc clean for new files (pre-existing TS2352 in `onboarding-onboardRepo.test.ts` still in deferred-items.md).
+**Last action:** Plan 10-04 shipped — `src/diagnose/handler.ts` (`registerDiagnoseRoute(app, deps)` + REQUIRED_PERMISSIONS canonical permission set + `compareBearer`/`parseBearer` test-seam helpers) + single async preHandler implementing 503-gate → rate-limit → bearer-auth (D-07) + content negotiation (Accept: text/markdown → markdown body, default JSON). `src/server.ts` now constructs Fastify with `trustProxy: true` (D-20); `BuildServerDeps` carries new mandatory `healthChecker`, `getAppOctokit`, `getInstallationOctokit` fields. `src/index.ts` wires the three deps from existing scope. Added `test/helpers/diagnose-deps.ts` typed no-op stub spread into 8 pre-existing integration test files to satisfy the new mandatory contract. Suite 665/665 green (was 640 → +25 handler unit tests); biome + tsc clean.
 
-**Next action:** Plan 10-04 — Handler + route registration + server.ts/index.ts wiring (composes probes + markdown renderer behind bearer/rate-limit/503-gate).
+**Next action:** Plan 10-05 — end-to-end integration coverage (app.inject through wired buildServer with msw'd GitHub + runProbes for full JSON/markdown contract exercise).
 
 ---
 *State initialized: 2026-05-20*

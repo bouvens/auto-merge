@@ -116,7 +116,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] 10-01-PLAN.md — rate-limit + redaction primitives (src/diagnose/rateLimit.ts, redact.ts)
 - [x] 10-02-PLAN.md — parallel probes module (src/diagnose/probes.ts + types.ts) composing Phase 6/7
 - [x] 10-03-PLAN.md — markdown renderer (src/diagnose/markdown.ts) with snapshot tests (completed 2026-05-24)
-- [ ] 10-04-PLAN.md — handler + route registration + server.ts/index.ts wiring
+- [x] 10-04-PLAN.md — handler + route registration + server.ts/index.ts wiring
 - [ ] 10-05-PLAN.md — end-to-end integration test for DIAG-01..04 Success Criteria
 **UI hint**: yes
 
@@ -146,7 +146,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 | 7. Config DEFAULT fallback | v1.1 | 4/4 | Complete   | 2026-05-23 |
 | 8. App Manifest flow | v1.1 | 0/6 | Planned | - |
 | 9. Onboarding webhook + PR-bot | v1.1 | 9/10 | In Progress|  |
-| 10. Diagnose endpoint | v1.1 | 1/5 | In Progress|  |
+| 10. Diagnose endpoint | v1.1 | 4/5 | In Progress|  |
 | 11. Release artifacts | v1.1 | 0/0 | Not started | - |
 
 ---
