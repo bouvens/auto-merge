@@ -28,7 +28,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] **Phase 7: Config DEFAULT fallback** — `DEFAULT_CASCADE_CONFIG_FILE` + `DEFAULT_CASCADE_CONFIG_YAML` org-default with precedence (repo > file > env) and hot-reload for file path (completed 2026-05-23)
 - [ ] **Phase 8: App Manifest flow** — `/setup/new` + `/setup/callback` one-click GitHub App creation with CSRF state, persist-before-render, duplicate-setup guard
 - [x] **Phase 9: Onboarding webhook + PR-bot** — `installation` / `installation_repositories` subscribers open idempotent draft PR with `.github/auto-merge.yml` + dispatch workflow, respect branch protection (completed 2026-05-24)
-- [ ] **Phase 10: Diagnose endpoint** — `GET /diagnose/{owner}/{repo}` with bearer-token auth, rate-limit, redaction; composes Phase 6/7/9 outputs
+- [x] **Phase 10: Diagnose endpoint** — `GET /diagnose/{owner}/{repo}` with bearer-token auth, rate-limit, redaction; composes Phase 6/7/9 outputs (completed 2026-05-24)
 - [ ] **Phase 11: Release artifacts** — Multi-arch GHCR image (matrix-per-arch + cosign keyless + SLSA provenance), Helm chart (single-replica guard, `existingSecretName`), Fly.io / Render / Compose+Caddy templates, README rewrite
 
 ## Phase Details
@@ -117,7 +117,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] 10-02-PLAN.md — parallel probes module (src/diagnose/probes.ts + types.ts) composing Phase 6/7
 - [x] 10-03-PLAN.md — markdown renderer (src/diagnose/markdown.ts) with snapshot tests (completed 2026-05-24)
 - [x] 10-04-PLAN.md — handler + route registration + server.ts/index.ts wiring
-- [ ] 10-05-PLAN.md — end-to-end integration test for DIAG-01..04 Success Criteria
+- [x] 10-05-PLAN.md — end-to-end integration test for DIAG-01..04 Success Criteria (completed 2026-05-24)
 **UI hint**: yes
 
 ### Phase 11: Release artifacts

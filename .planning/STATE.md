@@ -7,10 +7,10 @@ last_updated: "2026-05-24T12:21:02.383Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 29
-  completed_plans: 28
-  percent: 67
+  completed_plans: 29
+  percent: 83
 ---
 
 # State: auto-merge
@@ -21,13 +21,13 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 **Core Value:** Любой коммит, попавший в верхнюю ветку каскада, без участия человека доезжает до нижних веток — а если не доезжает (конфликт), команда сразу знает: кто, где, в каком репо, что чинить.
 
-**Current Focus:** Phase 10 — diagnose-endpoint
+**Current Focus:** Phase 10 — diagnose-endpoint — COMPLETED
 
 ## Current Position
 
-Phase: 10 (diagnose-endpoint) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
+Phase: 10 (diagnose-endpoint) — COMPLETED
+Plan: 5 of 5 — done
+Status: Phase complete; ready for verifier
 Last activity: 2026-05-24
 
 ## Last Milestone
@@ -60,9 +60,9 @@ Last activity: 2026-05-24
 
 ## Session Continuity
 
-**Last action:** Plan 10-04 shipped — `src/diagnose/handler.ts` (`registerDiagnoseRoute(app, deps)` + REQUIRED_PERMISSIONS canonical permission set + `compareBearer`/`parseBearer` test-seam helpers) + single async preHandler implementing 503-gate → rate-limit → bearer-auth (D-07) + content negotiation (Accept: text/markdown → markdown body, default JSON). `src/server.ts` now constructs Fastify with `trustProxy: true` (D-20); `BuildServerDeps` carries new mandatory `healthChecker`, `getAppOctokit`, `getInstallationOctokit` fields. `src/index.ts` wires the three deps from existing scope. Added `test/helpers/diagnose-deps.ts` typed no-op stub spread into 8 pre-existing integration test files to satisfy the new mandatory contract. Suite 665/665 green (was 640 → +25 handler unit tests); biome + tsc clean.
+**Last action:** Plan 10-05 shipped — `test/integration/diagnose-endpoint.test.ts` end-to-end coverage of Phase 10 ROADMAP SC1-SC4 via msw + buildServer + app.inject. Boots real wiring (server.ts + handler.ts + probes.ts + markdown.ts) against stubbed GitHub endpoints; 9 scenarios assert JSON envelope + markdown content negotiation (SC1), 503/401 auth gates (SC2), 11th-burst 429 + Retry-After (SC3), planted Slack/Telegram token redaction (SC4), plus a regression scenario for the app-not-installed early-exit invariant. Suite 674/674 green (was 665 → +9 integration tests); biome clean.
 
-**Next action:** Plan 10-05 — end-to-end integration coverage (app.inject through wired buildServer with msw'd GitHub + runProbes for full JSON/markdown contract exercise).
+**Next action:** Phase 10 verification (`/gsd-verify-phase 10`) → Phase 11 (Release artifacts) planning.
 
 ---
 *State initialized: 2026-05-20*
