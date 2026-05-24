@@ -4,6 +4,7 @@ import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { createNotifyHealthChecker, type NotifyStatus } from "../../src/notify/healthCheck.js";
 import { buildServer } from "../../src/server.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 import { createHealthCheckHarness } from "../helpers/msw-healthcheck.js";
 
 const SLACK_URL = "https://hooks.slack.com/services/T/B/X";
@@ -74,7 +75,12 @@ describe("/readyz notify_status integration", () => {
     const env = makeEnv({ SLACK_WEBHOOK_URL: SLACK_URL });
     const checker = createNotifyHealthChecker(env);
     await checker.refresh();
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -93,7 +99,12 @@ describe("/readyz notify_status integration", () => {
     });
     const checker = createNotifyHealthChecker(env);
     await checker.refresh();
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -107,7 +118,12 @@ describe("/readyz notify_status integration", () => {
   it("pending state before refresh — warn-only returns 200", async () => {
     const env = makeEnv({ SLACK_WEBHOOK_URL: SLACK_URL });
     const checker = createNotifyHealthChecker(env);
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -121,7 +137,12 @@ describe("/readyz notify_status integration", () => {
       NOTIFY_HEALTHCHECK_REQUIRED: true,
     });
     const checker = createNotifyHealthChecker(env);
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -138,7 +159,12 @@ describe("/readyz notify_status integration", () => {
     });
     const checker = createNotifyHealthChecker(env);
     await checker.refresh();
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -158,7 +184,12 @@ describe("/readyz notify_status integration", () => {
     });
     const checker = createNotifyHealthChecker(env);
     await checker.refresh();
-    app = await buildServer({ env, log: noopLog, readyzFn: makeWrappedReadyz(env, checker) });
+    app = await buildServer({
+      env,
+      log: noopLog,
+      readyzFn: makeWrappedReadyz(env, checker),
+      ...diagnoseDepsStub,
+    });
 
     for (let i = 0; i < 100; i++) {
       await app.inject({ method: "GET", url: "/readyz" });

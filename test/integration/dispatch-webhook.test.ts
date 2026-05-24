@@ -12,6 +12,7 @@ import { NoopChannel } from "../../src/notify/channel.js";
 import { buildServer } from "../../src/server.js";
 import { dedup } from "../../src/webhook/dedup.js";
 import { createMultiQueue, type MultiQueue } from "../../src/webhook/multiQueue.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 import { setupMswGitHub } from "../helpers/msw-github.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret-dispatch-32ch";
@@ -122,6 +123,7 @@ beforeAll(async () => {
     queue,
     notify: new NoopChannel(),
     onboarding,
+    ...diagnoseDepsStub,
   });
 });
 

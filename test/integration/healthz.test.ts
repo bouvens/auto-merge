@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
 // Minimal env subset needed by buildServer (only fields it actually uses)
 const fakeEnv: Env = {
@@ -35,7 +36,7 @@ describe("GET /healthz", () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    app = await buildServer({ env: fakeEnv, log: noopLog });
+    app = await buildServer({ env: fakeEnv, log: noopLog, ...diagnoseDepsStub });
   });
 
   afterEach(async () => {

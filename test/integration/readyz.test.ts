@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Env } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
 const fakeEnv: Env = {
   APP_ID: 1,
@@ -39,7 +40,7 @@ describe("GET /readyz", () => {
 
   it("returns 503 with reason 'readyz-not-wired' when no readyzFn provided", async () => {
     // Default fallback — readyz is intentionally degraded until server wires a real check (Plan 05)
-    app = await buildServer({ env: fakeEnv, log: noopLog });
+    app = await buildServer({ env: fakeEnv, log: noopLog, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -49,7 +50,7 @@ describe("GET /readyz", () => {
 
   it("returns 200 when readyzFn resolves { ok: true }", async () => {
     const readyzFn = async () => ({ ok: true as const });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -59,7 +60,7 @@ describe("GET /readyz", () => {
 
   it("returns 503 with forwarded reason when readyzFn resolves { ok: false }", async () => {
     const readyzFn = async () => ({ ok: false as const, reason: "jwt-expired" });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -69,7 +70,7 @@ describe("GET /readyz", () => {
 
   it("returns 503 when readyzFn resolves { ok: false } without reason", async () => {
     const readyzFn = async () => ({ ok: false as const });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -82,7 +83,7 @@ describe("GET /readyz", () => {
       ok: true as const,
       body: { notify_status: { slack: "ok", telegram: "n/a" } },
     });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -99,7 +100,7 @@ describe("GET /readyz", () => {
       reason: "notify-unreachable",
       body: { notify_status: { slack: "unreachable", telegram: "ok" } },
     });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -113,7 +114,7 @@ describe("GET /readyz", () => {
 
   it("200 response without body — exact shape, no extra keys (backward compat)", async () => {
     const readyzFn = async () => ({ ok: true as const });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -123,7 +124,7 @@ describe("GET /readyz", () => {
 
   it("503 response without body — exact shape, no extra keys (backward compat)", async () => {
     const readyzFn = async () => ({ ok: false as const, reason: "jwt-expired" });
-    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn });
+    app = await buildServer({ env: fakeEnv, log: noopLog, readyzFn, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "GET", url: "/readyz" });
 
@@ -132,7 +133,7 @@ describe("GET /readyz", () => {
   });
 
   it("POST /webhook returns 404 (route not registered until Plan 05)", async () => {
-    app = await buildServer({ env: fakeEnv, log: noopLog });
+    app = await buildServer({ env: fakeEnv, log: noopLog, ...diagnoseDepsStub });
 
     const response = await app.inject({ method: "POST", url: "/webhook", body: "{}" });
 

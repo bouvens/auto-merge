@@ -11,6 +11,7 @@ import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
 import { createCredentialsStore } from "../../src/setup/credentials.js";
 import { DOWNLOAD_COOKIE_NAME, STATE_COOKIE_NAME } from "../../src/setup/csrf.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
 const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 
@@ -125,7 +126,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
 
   it("SETUP_ENABLED=false → all three setup routes return 404", async () => {
     const env = makeEnv({ SETUP_ENABLED: false });
-    app = await buildServer({ env, log: noopLog });
+    app = await buildServer({ env, log: noopLog, ...diagnoseDepsStub });
 
     const newR = await app.inject({ method: "GET", url: "/setup/new" });
     const cbR = await app.inject({ method: "GET", url: "/setup/callback?code=X&state=Y" });
@@ -143,7 +144,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
       SETUP_OUTPUT_DIR: tmpDir,
     });
     const credentials = createCredentialsStore({ dir: tmpDir, log: noopLog });
-    app = await buildServer({ env, log: noopLog, credentials });
+    app = await buildServer({ env, log: noopLog, credentials, ...diagnoseDepsStub });
 
     const r = await app.inject({ method: "GET", url: "/setup/new" });
     expect(r.statusCode).toBe(200);
@@ -164,7 +165,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
       SETUP_OUTPUT_DIR: tmpDir,
     });
     const credentials = createCredentialsStore({ dir: tmpDir, log: noopLog });
-    app = await buildServer({ env, log: noopLog, credentials });
+    app = await buildServer({ env, log: noopLog, credentials, ...diagnoseDepsStub });
 
     const formR = await app.inject({ method: "GET", url: "/setup/new" });
     const state = extractCookieValue(readSetCookie(formR), STATE_COOKIE_NAME)!;
@@ -195,7 +196,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
       SETUP_OUTPUT_DIR: tmpDir,
     });
     const credentials = createCredentialsStore({ dir: tmpDir, log: noopLog });
-    app = await buildServer({ env, log: noopLog, credentials });
+    app = await buildServer({ env, log: noopLog, credentials, ...diagnoseDepsStub });
 
     const formR = await app.inject({ method: "GET", url: "/setup/new" });
     const state = extractCookieValue(readSetCookie(formR), STATE_COOKIE_NAME)!;
@@ -233,7 +234,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
       html_url: conversionFixture.html_url,
     });
 
-    app = await buildServer({ env, log: noopLog, credentials });
+    app = await buildServer({ env, log: noopLog, credentials, ...diagnoseDepsStub });
 
     const r = await app.inject({ method: "GET", url: "/setup/new" });
     expect(r.statusCode).toBe(200);
@@ -251,7 +252,7 @@ describe("Phase 8 end-to-end: setup-flow composition", () => {
       SETUP_OUTPUT_DIR: tmpDir,
     });
     const credentials = createCredentialsStore({ dir: tmpDir, log: noopLog });
-    app = await buildServer({ env, log: noopLog, credentials });
+    app = await buildServer({ env, log: noopLog, credentials, ...diagnoseDepsStub });
 
     const formR = await app.inject({ method: "GET", url: "/setup/new" });
     const state = extractCookieValue(readSetCookie(formR), STATE_COOKIE_NAME)!;

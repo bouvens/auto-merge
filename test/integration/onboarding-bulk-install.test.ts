@@ -16,6 +16,7 @@ import { _reset as resetSuppression } from "../../src/onboarding/suppressionSet.
 import { buildServer } from "../../src/server.js";
 import { dedup as realDedup } from "../../src/webhook/dedup.js";
 import { createMultiQueue } from "../../src/webhook/multiQueue.js";
+import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret-32-chars-long";
 const SLACK_URL = "https://hooks.slack.com/test";
@@ -267,6 +268,7 @@ beforeAll(async () => {
     queue: multiQueue,
     notify: new NoopChannel(),
     onboarding,
+    ...diagnoseDepsStub,
   });
 });
 

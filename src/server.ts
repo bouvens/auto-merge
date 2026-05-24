@@ -1,12 +1,15 @@
+import type { Octokit } from "@octokit/core";
 import Fastify from "fastify";
 import rawBodyPlugin from "fastify-raw-body";
 import type pino from "pino";
 import type { Probot } from "probot";
 import type { CascadeJob } from "./cascade/orchestrator.js";
+import { registerDiagnoseRoute } from "./diagnose/handler.js";
 import { registerDispatchHandler } from "./dispatch/handler.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
 import type { NotificationChannel } from "./notify/channel.js";
+import type { NotifyHealthChecker } from "./notify/healthCheck.js";
 import type { OnboardingHandlers } from "./onboarding/handler.js";
 import type { CredentialsStore } from "./setup/credentials.js";
 import { registerSetupRoutes } from "./setup/routes.js";
@@ -29,6 +32,11 @@ export interface BuildServerDeps {
   onboarding?: OnboardingHandlers;
   // Required only when env.SETUP_ENABLED — boot wiring (src/index.ts) constructs it inside the same flag-guarded block.
   credentials?: CredentialsStore;
+  // D-18: mandatory — diagnose route registers unconditionally and always reads healthChecker.getStatus() for the notify section.
+  healthChecker: NotifyHealthChecker;
+  // D-19: minted-on-demand App-JWT client for apps.getRepoInstallation (D-04); installation-scoped factory for downstream repo probes.
+  getAppOctokit: () => Octokit;
+  getInstallationOctokit: (installationId: number) => Promise<Octokit>;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -37,6 +45,8 @@ export async function buildServer(deps: BuildServerDeps) {
     logger: false,
     disableRequestLogging: true,
     bodyLimit: 5 * 1024 * 1024,
+    // D-20: needed for /diagnose req.ip behind Caddy / k8s ingress so per-IP rate-limit keys on the real client address.
+    trustProxy: true,
   });
 
   // global:false — only routes opting-in via config.rawBody:true incur raw-capture overhead; health routes are exempt
@@ -63,6 +73,15 @@ export async function buildServer(deps: BuildServerDeps) {
     }
 
     return { status: "ready", ...result.body };
+  });
+
+  // D-01 / D-18: registered unconditionally — 503-gate inside the handler covers the "DIAGNOSE_TOKEN unset" case so the route shape is stable for operator tooling.
+  registerDiagnoseRoute(app, {
+    env: deps.env,
+    log: deps.log,
+    appOctokit: deps.getAppOctokit(),
+    octokitFactory: deps.getInstallationOctokit,
+    healthChecker: deps.healthChecker,
   });
 
   if (deps.probot && deps.dedup && deps.queue && deps.notify && deps.onboarding) {

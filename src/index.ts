@@ -1,6 +1,13 @@
 import { mkdirSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
-import { attachWebhookErrorRedactor, createProbot, initBotIdentity, readyzCheck } from "./auth.js";
+import {
+  attachWebhookErrorRedactor,
+  createProbot,
+  getAppOctokit,
+  getInstallationOctokit,
+  initBotIdentity,
+  readyzCheck,
+} from "./auth.js";
 import { type CascadeJob, makeRunCascade } from "./cascade/orchestrator.js";
 import { initDefaultConfigLoader, stopDefaultConfigLoader } from "./config/defaultLoader.js";
 import { getRepoConfig } from "./config/loader.js";
@@ -125,6 +132,9 @@ try {
     notify,
     onboarding,
     credentials: credentialsStore,
+    healthChecker,
+    getAppOctokit,
+    getInstallationOctokit,
   });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   // AFTER listen so 3s × N probes never delay readiness for k8s rolling restart.
