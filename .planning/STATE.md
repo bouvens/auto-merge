@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T13:36:30Z"
+last_updated: "2026-05-24T09:55:20.543Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 21
-  percent: 52
+  completed_plans: 23
+  percent: 50
 ---
 
 # State: auto-merge
@@ -26,7 +26,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
-Plan: 8 of 10
+Plan: 10 of 10
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -56,9 +56,9 @@ Last activity: 2026-05-24
 
 ## Session Continuity
 
-**Last action:** Plan 09-07 shipped — `MultiChannel` gains optional `suppressionCheck` 2nd ctor arg. queue_overflow id extracted from `key` prefix (D-21); `NotifyEvent` union FROZEN. 11 unit tests; full suite 589/589 green. Pre-existing TS2352 in `onboarding-onboardRepo.test.ts` logged in `deferred-items.md`.
+**Last action:** Plan 09-08 shipped — `createOnboardingHandlers(deps)` factory: per-batch pLimit(2) (D-03), fire-and-forget (D-04), aggregate env-summary on bad outcomes, octokitFactory injection (D-29). External `p-limit` dependency replaced by ~25-LOC in-tree helper at `src/onboarding/pLimit.ts` to eliminate supply-chain risk. 21 new unit tests; full suite 610/610 green.
 
-**Next action:** Plan 09-08 — onboarding handler (p-limit batch + fire-and-forget + aggregate summary).
+**Next action:** Plan 09-09 — webhook wiring (mounting handlers + boot-time octokitFactory).
 
 ---
 *State initialized: 2026-05-20*

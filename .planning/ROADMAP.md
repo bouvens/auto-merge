@@ -99,8 +99,8 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] 09-05-PLAN.md — onboardRepo (9-step idempotent state machine per repo)
 - [x] 09-06-PLAN.md — multiQueue.clearByInstallation (additive method for installation.deleted cleanup)
 - [x] 09-07-PLAN.md — MultiChannel suppressionCheck option (additive ctor arg + queue_overflow key extraction)
-- [ ] 09-08-PLAN.md — onboarding handler (p-limit batch + fire-and-forget + aggregate summary + p-limit install)
-- [ ] 09-09-PLAN.md — wiring (webhook/handler signature + server.ts gate + index.ts boot)
+- [x] 09-08-PLAN.md — onboarding handler (p-limit batch + fire-and-forget + aggregate summary + p-limit install)
+- [x] 09-09-PLAN.md — wiring (webhook/handler signature + server.ts gate + index.ts boot)
 - [ ] 09-10-PLAN.md — integration test (SC1-SC5 end-to-end via msw + signed webhooks)
 
 ### Phase 10: Diagnose endpoint
@@ -140,7 +140,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 | 6. Foundation — env + notify healthCheck | v1.1 | 0/4 | Planned | - |
 | 7. Config DEFAULT fallback | v1.1 | 4/4 | Complete   | 2026-05-23 |
 | 8. App Manifest flow | v1.1 | 0/6 | Planned | - |
-| 9. Onboarding webhook + PR-bot | v1.1 | 6/10 | In Progress|  |
+| 9. Onboarding webhook + PR-bot | v1.1 | 9/10 | In Progress|  |
 | 10. Diagnose endpoint | v1.1 | 0/0 | Not started | - |
 | 11. Release artifacts | v1.1 | 0/0 | Not started | - |
 
