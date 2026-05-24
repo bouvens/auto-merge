@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { log } from "../../src/log.js";
-import { createMultiQueue } from "../../src/webhook/multiQueue.js";
+import { buildKey, createMultiQueue } from "../../src/webhook/multiQueue.js";
 import type { Job } from "../../src/webhook/queue.js";
 
 const makeNotify = () => ({ notify: vi.fn().mockResolvedValue(undefined) });
@@ -258,5 +258,123 @@ describe("createMultiQueue", () => {
     expect(resolved).toEqual([50, 100]);
 
     warnSpy.mockRestore();
+  });
+});
+
+describe("clearByInstallation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date", "performance", "setTimeout", "clearTimeout"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns 0 and leaves keyCount at 0 when queue is empty", () => {
+    const q = createMultiQueue({
+      perKeyMax: 10,
+      globalMax: 100,
+      handler: async () => {},
+      notify: makeNotify(),
+    });
+
+    expect(q.clearByInstallation(42)).toBe(0);
+    expect(q.keyCount()).toBe(0);
+  });
+
+  it("removes only lanes whose key has the matching installation prefix", async () => {
+    // Handler blocks so lanes stay in the map (running, buf empty) and we can observe deletion.
+    const releases: Array<() => void> = [];
+    const handler = async (): Promise<void> => {
+      await new Promise<void>((r) => releases.push(r));
+    };
+
+    const q = createMultiQueue({ perKeyMax: 10, globalMax: 100, handler, notify: makeNotify() });
+    q.enqueue(buildKey({ installation_id: 42, owner: "a", repo: "x" }), { id: "j1", payload: {} });
+    q.enqueue(buildKey({ installation_id: 42, owner: "a", repo: "y" }), { id: "j2", payload: {} });
+    q.enqueue(buildKey({ installation_id: 99, owner: "b", repo: "z" }), { id: "j3", payload: {} });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(q.keyCount()).toBe(3);
+
+    expect(q.clearByInstallation(42)).toBe(2);
+    expect(q.keyCount()).toBe(1);
+
+    for (const r of releases) r();
+    await vi.runAllTimersAsync();
+  });
+
+  it("returns 0 and leaves all lanes untouched when no key matches", async () => {
+    const releases: Array<() => void> = [];
+    const handler = async (): Promise<void> => {
+      await new Promise<void>((r) => releases.push(r));
+    };
+
+    const q = createMultiQueue({ perKeyMax: 10, globalMax: 100, handler, notify: makeNotify() });
+    q.enqueue(buildKey({ installation_id: 99, owner: "b", repo: "z" }), { id: "j1", payload: {} });
+    q.enqueue(buildKey({ installation_id: 99, owner: "b", repo: "y" }), { id: "j2", payload: {} });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(q.keyCount()).toBe(2);
+
+    expect(q.clearByInstallation(42)).toBe(0);
+    expect(q.keyCount()).toBe(2);
+
+    for (const r of releases) r();
+    await vi.runAllTimersAsync();
+  });
+
+  it("does not match installation prefix that shares a digit-prefix without slash boundary", async () => {
+    const releases: Array<() => void> = [];
+    const handler = async (): Promise<void> => {
+      await new Promise<void>((r) => releases.push(r));
+    };
+
+    const q = createMultiQueue({ perKeyMax: 10, globalMax: 100, handler, notify: makeNotify() });
+    q.enqueue(buildKey({ installation_id: 42, owner: "a", repo: "x" }), { id: "j1", payload: {} });
+    q.enqueue(buildKey({ installation_id: 420, owner: "a", repo: "x" }), { id: "j2", payload: {} });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(q.keyCount()).toBe(2);
+
+    expect(q.clearByInstallation(42)).toBe(1);
+    expect(q.keyCount()).toBe(1);
+
+    for (const r of releases) r();
+    await vi.runAllTimersAsync();
+  });
+
+  it("removes running lane from map but does not abort in-flight job", async () => {
+    let resolveBlocking!: () => void;
+    const blocking = new Promise<void>((r) => {
+      resolveBlocking = r;
+    });
+
+    let handlerCalls = 0;
+    const handler = async (): Promise<void> => {
+      handlerCalls++;
+      await blocking;
+    };
+
+    const q = createMultiQueue({ perKeyMax: 10, globalMax: 100, handler, notify: makeNotify() });
+    const key = buildKey({ installation_id: 42, owner: "a", repo: "x" });
+    q.enqueue(key, { id: "j1", payload: {} });
+
+    // Let microtasks + runLane start. Handler is now awaiting blocking promise.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(handlerCalls).toBe(1);
+    expect(q.keyCount()).toBe(1);
+
+    expect(q.clearByInstallation(42)).toBe(1);
+    expect(q.keyCount()).toBe(0);
+
+    // In-flight job still completes once unblocked; handler count stays at 1 (no abort, no re-run).
+    resolveBlocking();
+    await vi.runAllTimersAsync();
+    expect(handlerCalls).toBe(1);
   });
 });
