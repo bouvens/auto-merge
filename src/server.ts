@@ -7,6 +7,7 @@ import { registerDispatchHandler } from "./dispatch/handler.js";
 import type { Env } from "./env.js";
 import { log } from "./log.js";
 import type { NotificationChannel } from "./notify/channel.js";
+import type { OnboardingHandlers } from "./onboarding/handler.js";
 import type { CredentialsStore } from "./setup/credentials.js";
 import { registerSetupRoutes } from "./setup/routes.js";
 import { registerHandlers } from "./webhook/handler.js";
@@ -24,6 +25,8 @@ export interface BuildServerDeps {
   queue?: MultiQueue<CascadeJob>;
   // D-01: clustered with webhook-wiring deps — gated together so push handler always has notify forwarded into loadConfig
   notify?: NotificationChannel;
+  // D-28: clustered with webhook-wiring deps — mandatory when probot/dedup/queue/notify are present so onboarding events reach the domain handler. Gate is fail-closed: missing onboarding → entire webhook block skipped.
+  onboarding?: OnboardingHandlers;
   // Required only when env.SETUP_ENABLED — boot wiring (src/index.ts) constructs it inside the same flag-guarded block.
   credentials?: CredentialsStore;
 }
@@ -64,8 +67,8 @@ export async function buildServer(deps: BuildServerDeps) {
     return { status: "ready", ...result.body };
   });
 
-  if (deps.probot && deps.dedup && deps.queue && deps.notify) {
-    registerHandlers(deps.probot);
+  if (deps.probot && deps.dedup && deps.queue && deps.notify && deps.onboarding) {
+    registerHandlers(deps.probot, { onboarding: deps.onboarding });
     registerPushHandler(deps.probot, { queue: deps.queue, notify: deps.notify });
     registerDispatchHandler(deps.probot, { queue: deps.queue });
 
