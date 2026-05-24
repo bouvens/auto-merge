@@ -12,6 +12,9 @@ import { MultiChannel } from "./notify/dispatcher.js";
 import { createNotifyHealthChecker, type NotifyStatus } from "./notify/healthCheck.js";
 import { SlackChannel } from "./notify/slack.js";
 import { TelegramChannel } from "./notify/telegram.js";
+import { createOnboardingHandlers } from "./onboarding/handler.js";
+import { isOnboarding } from "./onboarding/suppressionSet.js";
+import { getInstallationOctokitWithRetry } from "./onboarding/tokenRetry.js";
 import { buildServer } from "./server.js";
 import {
   checkStaleOnBoot,
@@ -73,13 +76,21 @@ try {
       }),
     );
   }
-  const notify = new MultiChannel(channels);
+  // D-20: suppressionCheck routes onboarding-tagged installation IDs away from user channels.
+  const notify = new MultiChannel(channels, { suppressionCheck: (id) => isOnboarding(id) });
 
   multiQueue = createMultiQueue<CascadeJob>({
     perKeyMax: env.WEBHOOK_QUEUE_PER_KEY_MAX,
     globalMax: env.WEBHOOK_QUEUE_MAX,
     handler: makeRunCascade({ notify }),
     notify,
+  });
+
+  // D-29: canonical onboarding wiring — octokitFactory injected via Plan 09-02 retry wrapper.
+  const onboarding = createOnboardingHandlers({
+    octokitFactory: getInstallationOctokitWithRetry,
+    multiQueue,
+    env,
   });
 
   cronHandle = await startCron({ env, multiQueue, log: appLog });
@@ -112,6 +123,7 @@ try {
     dedup,
     queue: multiQueue,
     notify,
+    onboarding,
     credentials: credentialsStore,
   });
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
