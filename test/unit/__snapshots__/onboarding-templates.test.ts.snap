@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DISPATCH_WORKFLOW_YML > matches snapshot 1`] = `
+"name: auto-merge dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: SHA to cascade from source branch
+        required: true
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST "$APP_URL/dispatch" \\
+            -H "Authorization: Bearer \${{ secrets.AUTO_MERGE_TOKEN }}" \\
+            -d '{"sha":"\${{ inputs.source_sha }}"}'
+        env:
+          APP_URL: \${{ vars.AUTO_MERGE_APP_URL }}
+"
+`;
+
+exports[`buildPrBody > matches snapshot with all fields populated 1`] = `
+"@octocat This PR bootstraps auto-merge cascade configuration for \`acme/api\`.
+
+## What this does
+Adds \`.github/auto-merge.yml\` (cascade config — default branch is \`main\`, dev branch is \`dev\`) and a dispatch workflow.
+
+## Before merging — checklist
+- [ ] If you have a staging/release branch between \`main\` and \`dev\`, uncomment \`release_branch\` in \`.github/auto-merge.yml\`.
+- [ ] If you want Slack/Telegram conflict alerts, add \`notifications.slack.channel\` / \`notifications.telegram.chat_id\` to the yml.
+- [ ] Verify that \`main\` and \`dev\` branches both exist in this repository.
+
+**Diagnose:** [https://app.example.com/diagnose/acme/api](https://app.example.com/diagnose/acme/api)
+"
+`;
