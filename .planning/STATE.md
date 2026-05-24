@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: executing
-last_updated: "2026-05-24T13:20:00.000Z"
-last_activity: 2026-05-24 -- 09-04 envNotify shipped
+last_updated: "2026-05-24T13:25:00.000Z"
+last_activity: 2026-05-24 -- 09-06 MultiQueue.clearByInstallation shipped
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 24
-  completed_plans: 17
-  percent: 54
+  completed_plans: 18
+  percent: 58
 ---
 
 # State: auto-merge
@@ -26,9 +26,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 ## Current Position
 
 Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
-Plan: 4 of 10
+Plan: 6 of 10
 Status: Ready to execute
-Last activity: 2026-05-24 -- 09-04 envNotify shipped (3/3 tasks, 8/8 tests)
+Last activity: 2026-05-24 -- 09-06 MultiQueue.clearByInstallation shipped (2/2 tasks, 12/12 multi-queue tests, 560/560 total)
 
 ## Last Milestone
 
@@ -56,9 +56,9 @@ Last activity: 2026-05-24 -- 09-04 envNotify shipped (3/3 tasks, 8/8 tests)
 
 ## Session Continuity
 
-**Last action:** Phase 9 CONTEXT.md captured. 4 серые зоны разрешены: overflow (standalone p-limit(2), no MultiQueue), branch-protection fallback (env-level notify, not Issue), installation.deleted cleanup (only MultiQueue.clearByInstallation; LRU stay on TTL), notify suppression (per-installation TTL-Set с DI callback в MultiChannel). SC2/SC4/SC5 переформулированы.
+**Last action:** Plan 09-06 shipped — `MultiQueue.clearByInstallation` (additive extension of FROZEN multiQueue, +14/-0 lines, slash-boundary prefix match, detach-not-abort semantics). 4 downstream mocks widened. 5 new unit tests + 7 pre-existing pass; full suite 560/560 green.
 
-**Next action:** `/gsd:plan-phase 9 --chain` (continues chain) — research + plan для onboarding webhook + PR-bot, 8 ONBOARD requirements + 5 reinterpreted SC.
+**Next action:** Continue Phase 9 execution — Plan 09-05 (skipped in Wave 3 order — execute now) or Plan 09-07 next, per wave plan.
 
 ---
 *State initialized: 2026-05-20*
