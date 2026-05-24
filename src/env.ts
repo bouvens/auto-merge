@@ -15,6 +15,7 @@ const Base = z.object({
   SLACK_WEBHOOK_URL: z.url().optional(),
   // D-02: min(40) catches truncated/empty tokens without locking to provider-specific regex.
   TELEGRAM_BOT_TOKEN: z.string().min(40).optional(),
+  TELEGRAM_DEFAULT_CHAT_ID: z.string().min(1).optional(),
   // D-04: v1.1 env vars staged together so Phases 7-10 consume them as already-validated.
   NOTIFY_HEALTHCHECK_REQUIRED: z.coerce.boolean().default(false),
   NOTIFY_HEALTHCHECK_TTL_MS: z.coerce.number().int().positive().default(900_000),
