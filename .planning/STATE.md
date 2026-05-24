@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
-status: ready_to_plan
-last_updated: 2026-05-24T10:32:27.851Z
+status: planning
+last_updated: "2026-05-24T11:26:40.205Z"
 last_activity: 2026-05-24
+stopped_at: Phase 10 context gathered — ready to plan
+resume_file: .planning/phases/10-diagnose-endpoint/10-CONTEXT.md
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 24
   completed_plans: 24
   percent: 67
-stopped_at: Phase 09 complete (10/10) — ready to discuss Phase 10
 ---
 
 # State: auto-merge

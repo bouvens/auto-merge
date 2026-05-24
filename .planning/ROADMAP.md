@@ -112,7 +112,12 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
   2. Запрос без `Authorization: Bearer` / с неправильным токеном → 401 за константное время (timingSafeEqual); если `DIAGNOSE_TOKEN` env не задан — endpoint возвращает 503 (disabled)
   3. 11-й запрос с одного IP за 60s → 429 (in-memory TTL-LRU rate-limit)
   4. Response никогда не содержит full Slack webhook URL / Telegram bot token / private key: Slack URL отображается как `https://hooks.slack.com/services/.../****`, secrets — only `present/absent + byte length`
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 10-01-PLAN.md — rate-limit + redaction primitives (src/diagnose/rateLimit.ts, redact.ts)
+- [ ] 10-02-PLAN.md — parallel probes module (src/diagnose/probes.ts + types.ts) composing Phase 6/7
+- [ ] 10-03-PLAN.md — markdown renderer (src/diagnose/markdown.ts) with snapshot tests
+- [ ] 10-04-PLAN.md — handler + route registration + server.ts/index.ts wiring
+- [ ] 10-05-PLAN.md — end-to-end integration test for DIAG-01..04 Success Criteria
 **UI hint**: yes
 
 ### Phase 11: Release artifacts
@@ -141,7 +146,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 | 7. Config DEFAULT fallback | v1.1 | 4/4 | Complete   | 2026-05-23 |
 | 8. App Manifest flow | v1.1 | 0/6 | Planned | - |
 | 9. Onboarding webhook + PR-bot | v1.1 | 9/10 | In Progress|  |
-| 10. Diagnose endpoint | v1.1 | 0/0 | Not started | - |
+| 10. Diagnose endpoint | v1.1 | 0/5 | Planned | - |
 | 11. Release artifacts | v1.1 | 0/0 | Not started | - |
 
 ---
