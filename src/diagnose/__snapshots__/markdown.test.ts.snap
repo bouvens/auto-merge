@@ -1,0 +1,126 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderMarkdown > renders all-green report (Fixture A) 1`] = `
+"# Diagnose: acme/widgets
+
+_checked at 2026-05-24T12:00:00.000Z_  
+**Overall:** ✅ ok
+
+## App
+- ✅ installed: yes (installation_id=12345)
+- ✅ permissions: actual={checks:write, contents:write, metadata:read, pull_requests:write}; required={checks:write, contents:write, metadata:read, pull_requests:write}; missing=[]
+
+## Config
+- ✅ source: repo
+- main_branch: main
+- release_branch: release
+- dev_branch: dev
+- errors: -
+
+## Branches
+- dev: exists=true, protected=false
+- main: exists=true, protected=true
+- release: exists=true, protected=true
+
+## Notify
+- ✅ slack: ok
+- ✅ telegram: ok
+
+## Onboarding
+- ✅ config in repo
+- config_present: true
+"
+`;
+
+exports[`renderMarkdown > renders app-not-installed report (Fixture B) 1`] = `
+"# Diagnose: acme/widgets
+
+_checked at 2026-05-24T12:00:00.000Z_  
+**Overall:** ❌ issues found
+
+## App
+- ❌ installed: app-not-installed
+- ➖ permissions: actual={}; required={checks:write, contents:write, metadata:read, pull_requests:write}; missing=[]
+
+## Config
+- ➖ source: none
+- main_branch: -
+- release_branch: -
+- dev_branch: -
+- errors: -
+
+## Branches
+- (no branches resolved)
+
+## Notify
+- ➖ slack: n/a
+- ➖ telegram: n/a
+
+## Onboarding
+- ➖ app not installed
+- config_present: false
+"
+`;
+
+exports[`renderMarkdown > renders onboarding warn with open PR report (Fixture D) 1`] = `
+"# Diagnose: acme/widgets
+
+_checked at 2026-05-24T12:00:00.000Z_  
+**Overall:** ❌ issues found
+
+## App
+- ✅ installed: yes (installation_id=12345)
+- ✅ permissions: actual={checks:write, contents:write, metadata:read, pull_requests:write}; required={checks:write, contents:write, metadata:read, pull_requests:write}; missing=[]
+
+## Config
+- ⚠️ source: none
+- main_branch: -
+- release_branch: -
+- dev_branch: -
+- errors: no config in repo and no defaults provided
+
+## Branches
+- main: exists=true, protected=false
+
+## Notify
+- ✅ slack: ok
+- ✅ telegram: ok
+
+## Onboarding
+- ⚠️ onboarding PR #42 waiting for review
+- config_present: false
+- open_pr: #42 https://github.com/acme/widgets/pull/42
+"
+`;
+
+exports[`renderMarkdown > renders permission gap + missing branch report (Fixture C) 1`] = `
+"# Diagnose: acme/widgets
+
+_checked at 2026-05-24T12:00:00.000Z_  
+**Overall:** ❌ issues found
+
+## App
+- ✅ installed: yes (installation_id=12345)
+- ❌ permissions: actual={checks:write, metadata:read, pull_requests:write}; required={checks:write, contents:write, metadata:read, pull_requests:write}; missing=[contents]
+
+## Config
+- ✅ source: repo
+- main_branch: main
+- release_branch: release
+- dev_branch: dev
+- errors: -
+
+## Branches
+- dev: exists=true, protected=false
+- main: exists=true, protected=true
+- release: exists=false, protected=false
+
+## Notify
+- ✅ slack: ok
+- ➖ telegram: n/a
+
+## Onboarding
+- ✅ config in repo
+- config_present: true
+"
+`;
