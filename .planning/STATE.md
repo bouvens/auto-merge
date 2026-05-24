@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
-status: verifying
-last_updated: "2026-05-24T00:00:00.000Z"
-last_activity: 2026-05-24 -- 09-CONTEXT.md captured (SC2/SC4/SC5 reinterpreted)
+status: executing
+last_updated: "2026-05-24T08:08:40.258Z"
+last_activity: 2026-05-24 -- 09-01 suppressionSet shipped
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 24
+  completed_plans: 15
   percent: 50
 ---
 
@@ -21,14 +21,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 **Core Value:** Любой коммит, попавший в верхнюю ветку каскада, без участия человека доезжает до нижних веток — а если не доезжает (конфликт), команда сразу знает: кто, где, в каком репо, что чинить.
 
-**Current Focus:** Phase 08 — app-manifest-flow
+**Current Focus:** Phase 09 — onboarding-webhook-pr-bot
 
 ## Current Position
 
-Phase: 09 (onboarding-webhook-pr-bot) — CONTEXT.md captured, ready for plan-phase
-Plan: 0 of N
-Status: Phase 09 context gathered (SC2/SC4/SC5 reinterpreted)
-Last activity: 2026-05-24 -- 09-CONTEXT.md committed
+Phase: 09 (onboarding-webhook-pr-bot) — EXECUTING
+Plan: 2 of 10
+Status: Ready to execute
+Last activity: 2026-05-24 -- 09-01 suppressionSet shipped (2/2 tasks, 5/5 tests)
 
 ## Last Milestone
 
