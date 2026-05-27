@@ -1,0 +1,98 @@
+# HARD GUARD: replicaCount must remain 1.
+# auto-merge holds the cascade queue in-memory (MultiQueue); running two replicas
+# causes duplicate merge attempts, race conditions, and split-brain conflict detection.
+# See templates/deployment.yaml for the {{ fail }} enforcement.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/OWNER/auto-merge
+  # Empty tag falls back to .Chart.AppVersion at render time.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# REQUIRED. Name of a pre-existing Kubernetes Secret that contains all secrets
+# the app needs at startup:
+#   APP_ID         — GitHub App numeric ID
+#   WEBHOOK_SECRET — webhook HMAC secret (min 16 chars)
+#   PRIVATE_KEY    — RSA private key PEM (raw or base64-encoded; REL-08 decodes both)
+# Optional entries in the same Secret:
+#   PRIVATE_KEY_PATH       — path to a mounted PEM file (alternative to PRIVATE_KEY)
+#   SLACK_WEBHOOK_URL      — Slack incoming webhook URL
+#   TELEGRAM_BOT_TOKEN     — Telegram bot token (min 40 chars)
+#   TELEGRAM_DEFAULT_CHAT_ID
+#   DIAGNOSE_TOKEN         — bearer token for /diagnose endpoint
+# Set via: helm install auto-merge ./deploy/helm/auto-merge --set existingSecretName=<name>
+existingSecretName: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Matches Dockerfile: USER node resolves to uid 1000 in the node:24-alpine image.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# readOnlyRootFilesystem is false by default because Probot may write temp files
+# at startup. Opt in only after running `docker run --read-only --tmpfs /tmp` locally
+# and confirming the app starts without EROFS errors (RESEARCH Open Question 2).
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  readiness:
+    path: /readyz
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  liveness:
+    # Matches Dockerfile HEALTHCHECK path.
+    path: /healthz
+    initialDelaySeconds: 15
+    periodSeconds: 30
+
+# 60 s is 2× the SHUTDOWN_TIMEOUT default (30 s) to give the app full drain time
+# before k8s sends SIGKILL.
+terminationGracePeriodSeconds: 60
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # Override the generated name by setting this field.
+  name: ""
+
+# Extra non-secret environment variables added to the container.
+# Suitable for: LOG_LEVEL, CRON_SCHEDULE, WEBHOOK_QUEUE_MAX, etc.
+# Do NOT add secrets here — use existingSecretName for all credentials.
+extraEnv: []
+# Example:
+#   - name: LOG_LEVEL
+#     value: debug
+
+# Additional envFrom entries (secretRef or configMapRef) merged after existingSecretName.
+# Useful for split-secret patterns or operator-supplied ConfigMaps.
+extraEnvFrom: []
+# Example:
+#   - configMapRef:
+#       name: auto-merge-config
+#       optional: true

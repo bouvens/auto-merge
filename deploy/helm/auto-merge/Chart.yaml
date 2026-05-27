@@ -1,0 +1,16 @@
+apiVersion: v2
+name: auto-merge
+description: Self-hosted GitHub App for cascade merges (single-replica)
+type: application
+version: 0.1.0
+# appVersion must match the GHCR image tag published by release.yml.
+appVersion: "1.1.0"
+# k8s 1.24+ for httpGet probes with named ports and structured securityContext.
+kubeVersion: ">=1.24.0-0"
+keywords:
+  - github-app
+  - cascade-merge
+  - self-hosted
+home: https://github.com/OWNER/auto-merge
+sources:
+  - https://github.com/OWNER/auto-merge
