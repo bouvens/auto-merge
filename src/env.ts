@@ -61,6 +61,14 @@ export type Env = Omit<z.infer<typeof EnvSchema>, "PRIVATE_KEY" | "PRIVATE_KEY_P
   PRIVATE_KEY: string;
 };
 
+// PaaS env vars and k8s Secrets without stringData deliver base64-encoded PEM.
+export function decodeMaybeBase64Pem(raw: string): string {
+  if (raw.includes("-----BEGIN")) return raw;
+  const decoded = Buffer.from(raw, "base64").toString("utf8");
+  if (decoded.includes("-----BEGIN")) return decoded;
+  return raw;
+}
+
 export function loadEnv(): Env {
   const result = EnvSchema.safeParse(process.env);
 
@@ -80,7 +88,8 @@ export function loadEnv(): Env {
 
   // Synchronous file read is acceptable at boot-time before the event loop opens (D-23).
   const keyPath = e.PRIVATE_KEY_PATH;
-  const PRIVATE_KEY = e.PRIVATE_KEY ?? (keyPath !== undefined ? readFileSync(keyPath, "utf8") : "");
+  const rawKey = e.PRIVATE_KEY ?? (keyPath !== undefined ? readFileSync(keyPath, "utf8") : "");
+  const PRIVATE_KEY = decodeMaybeBase64Pem(rawKey);
 
   const { PRIVATE_KEY: _inlineKey, PRIVATE_KEY_PATH: _path, ...rest } = e;
   return { ...rest, PRIVATE_KEY };
