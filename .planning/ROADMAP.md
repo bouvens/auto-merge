@@ -29,7 +29,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [ ] **Phase 8: App Manifest flow** — `/setup/new` + `/setup/callback` one-click GitHub App creation with CSRF state, persist-before-render, duplicate-setup guard
 - [x] **Phase 9: Onboarding webhook + PR-bot** — `installation` / `installation_repositories` subscribers open idempotent draft PR with `.github/auto-merge.yml` + dispatch workflow, respect branch protection (completed 2026-05-24)
 - [x] **Phase 10: Diagnose endpoint** — `GET /diagnose/{owner}/{repo}` with bearer-token auth, rate-limit, redaction; composes Phase 6/7/9 outputs (completed 2026-05-24)
-- [ ] **Phase 11: Release artifacts** — Multi-arch GHCR image (matrix-per-arch + cosign keyless + SLSA provenance), Helm chart (single-replica guard, `existingSecretName`), Fly.io / Render / Compose+Caddy templates, README rewrite
+- [x] **Phase 11: Release artifacts** — Multi-arch GHCR image (matrix-per-arch + cosign keyless + SLSA provenance), Helm chart (single-replica guard, `existingSecretName`), Fly.io / Render / Compose+Caddy templates, README rewrite (completed 2026-05-27)
 
 ## Phase Details
 
@@ -137,7 +137,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 - [x] 11-03-PLAN.md — Helm chart (single-replica fail-guard + existingSecretName + pod security)
 - [x] 11-04-PLAN.md — examples/compose/ Compose + Caddy template with LE staging overlay
 - [x] 11-05-PLAN.md — examples/paas/ Fly.io + Render.com Blueprint templates
-- [ ] 11-06-PLAN.md — README full rewrite (decision matrix + three install paths + Mermaid cascade diagram)
+- [x] 11-06-PLAN.md — README full rewrite (decision matrix + three install paths + Mermaid cascade diagram)
 
 ## Progress
 
@@ -153,7 +153,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 | 8. App Manifest flow | v1.1 | 0/6 | Planned | - |
 | 9. Onboarding webhook + PR-bot | v1.1 | 9/10 | In Progress|  |
 | 10. Diagnose endpoint | v1.1 | 4/5 | In Progress|  |
-| 11. Release artifacts | v1.1 | 5/6 | In Progress|  |
+| 11. Release artifacts | v1.1 | 6/6 | Complete   | 2026-05-27 |
 
 ---
 
