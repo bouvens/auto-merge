@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "auto-merge.fullname" . }}
+  labels:
+    {{- include "auto-merge.labels" . | nindent 4 }}
+spec:
+  {{/* ClusterIP only: webhook ingress must go through an Ingress controller for TLS termination. NodePort/LoadBalancer bypass TLS and are not supported in v1.1. */}}
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "auto-merge.selectorLabels" . | nindent 4 }}

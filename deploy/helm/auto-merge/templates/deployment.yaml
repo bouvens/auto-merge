@@ -1,0 +1,63 @@
+{{/* Hard guard: fail before any YAML is emitted so helm install AND helm upgrade both reject replicaCount>1. */}}
+{{- if gt (int .Values.replicaCount) 1 }}
+{{- fail "replicaCount must be 1 — auto-merge uses in-memory state that is not safe for multi-replica. Set --set replicaCount=1. See README." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "auto-merge.fullname" . }}
+  labels:
+    {{- include "auto-merge.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "auto-merge.selectorLabels" . | nindent 6 }}
+  {{/* Recreate rather than RollingUpdate: single-replica + in-memory queue means no old+new overlap is possible without data loss. Recreate guarantees the old pod releases all in-flight webhook locks before the new one starts. */}}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "auto-merge.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "auto-merge.serviceAccountName" . }}
+      {{/* The app never calls the k8s API; automounting the token widens the attack surface without benefit. */}}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: auto-merge
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ required "existingSecretName must be set to the name of a k8s Secret containing APP_ID, WEBHOOK_SECRET, and PRIVATE_KEY" .Values.existingSecretName }}
+            {{- range .Values.extraEnvFrom }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          {{- if .Values.extraEnv }}
+          env:
+            {{- toYaml .Values.extraEnv | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
