@@ -41,7 +41,7 @@
 - [x] **REL-03**: Helm chart в `deploy/helm/auto-merge/` — `Chart.yaml` (apiVersion v2), `values.yaml`, шаблоны: `deployment.yaml`, `service.yaml`, `ingress.yaml`, `serviceaccount.yaml`. **HARD GUARD:** `replicaCount: 1` с `fail` если оператор задаёт больше (in-memory cascade lock не поддерживает multi-replica)
 - [x] **REL-04**: Helm secret management — `existingSecretName` reference вместо inline (no `PRIVATE_KEY` в `values.yaml`); поддержка external-secrets pattern через `envFrom.secretRef`; webhook secret / Slack URL / Telegram token — все через secret references
 - [x] **REL-05**: Helm pod spec — `terminationGracePeriodSeconds: 60` (соответствует SHUTDOWN_TIMEOUT_MS), readinessProbe на `/readyz`, livenessProbe на `/healthz`, `runAsNonRoot: true`, `runAsUser: 1000` (matches Dockerfile)
-- [ ] **REL-06**: Docker Compose template в `examples/compose/docker-compose.yml` + `Caddyfile` — Caddy reverse-proxy с auto-TLS via Let's Encrypt. README с DNS-first checklist (поднять DNS A-record → подождать propagation → `docker compose up`); ship `compose.staging.yml` overlay с Let's Encrypt staging endpoint для testing
+- [x] **REL-06**: Docker Compose template в `examples/compose/docker-compose.yml` + `Caddyfile` — Caddy reverse-proxy с auto-TLS via Let's Encrypt. README с DNS-first checklist (поднять DNS A-record → подождать propagation → `docker compose up`); ship `compose.staging.yml` overlay с Let's Encrypt staging endpoint для testing
 - [ ] **REL-07**: Fly.io template в `examples/paas/fly/` — `fly.toml` с health checks, env vars (`PRIVATE_KEY` через `fly secrets set` с base64-encoded PEM), README с пошаговым deploy
 - [x] **REL-08**: Render.com template в `examples/paas/render/` — `render.yaml` blueprint, env-секреты, README. PaaS-агностичный совет: поддержка `PRIVATE_KEY` как base64 (новые строки превращаются в `\n` через env) — добавить в env loader разовое base64-decode если строка начинается с `-----BEGIN`-маркером после decode
 - [ ] **REL-09**: README rewrite — секция «Install» с тремя путями (One-click Manifest + Compose+Caddy / Helm / PaaS), DNS-first warning для Compose, troubleshooting секция, ссылки на `/diagnose`
@@ -105,7 +105,7 @@
 | REL-03 | Phase 11 | Complete |
 | REL-04 | Phase 11 | Complete |
 | REL-05 | Phase 11 | Complete |
-| REL-06 | Phase 11 | Pending |
+| REL-06 | Phase 11 | Complete |
 | REL-07 | Phase 11 | Pending |
 | REL-08 | Phase 11 | Complete |
 | REL-09 | Phase 11 | Pending |

@@ -1,0 +1,32 @@
+# fly.toml — auto-merge deployment config for Fly.io
+# Run `flyctl deploy --image ghcr.io/OWNER/auto-merge:vX.Y.Z` — no local build required.
+
+app = "auto-merge"   # Replace with your fly app slug (must be globally unique on fly.io)
+primary_region = "iad"   # Pick a region close to GitHub's webhook origin (us-east is fastest)
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
+
+[http_service]
+internal_port = 3000
+force_https = true
+# Webhook receivers must stay running at all times.
+# auto_stop_machines = true (Fly default) hibernates idle machines — GitHub retries webhooks
+# for only 5-30 minutes then gives up, causing silent missed cascades (RESEARCH Pitfall 6).
+# Idle cost for shared-cpu-1x is negligible (~$2-4/mo at time of writing).
+auto_stop_machines = false
+auto_start_machines = true
+
+[[http_service.checks]]
+grace_period = "15s"
+interval = "30s"
+method = "GET"
+path = "/healthz"
+timeout = "5s"
+
+[[vm]]
+# shared-cpu-1x + 256mb is the floor for this app.
+# Bump to 512mb if onboarding heavy installs (> 100 repositories at once).
+size = "shared-cpu-1x"
+memory = "256mb"
