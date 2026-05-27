@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: auto-merge
+    runtime: image
+    image:
+      # Pin a semver tag in production — :latest causes silent redeploy on every
+      # Render image-refresh cycle and makes rollbacks ambiguous (RESEARCH Anti-Patterns).
+      url: ghcr.io/OWNER/auto-merge:v1.1.0   # replace OWNER and bump tag via PR before each upgrade
+    plan: starter   # Starter is the floor that allows persistent IPs; downgrade to free only for staging
+    region: oregon   # Change to a region close to GitHub's webhook origin for lower latency
+    healthCheckPath: /healthz
+    # autoDeploy: false prevents Render from re-pulling the image tag on its own schedule.
+    # Operator triggers deploys manually after cosign-verifying the new image.
+    autoDeploy: false
+    envVars:
+      # Secrets — operator enters these values in the Render dashboard; they are never stored in this file.
+      - key: APP_ID
+        sync: false   # numeric ID from your GitHub App settings page
+      - key: WEBHOOK_SECRET
+        sync: false   # output of: openssl rand -hex 32
+      - key: PRIVATE_KEY
+        # Paste the base64-encoded PEM (cat app-key.pem | base64 | tr -d '\n').
+        # auto-merge decodes base64-PEM transparently at boot (REL-08 decodeMaybeBase64Pem).
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false   # optional — Slack incoming webhook URL
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false   # optional — Telegram bot token (min 40 chars)
+      - key: DIAGNOSE_TOKEN
+        sync: false   # optional — bearer token for /diagnose endpoint
+      # Non-secret config — values are committed here intentionally.
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
