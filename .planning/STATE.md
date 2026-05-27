@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
 status: verifying
-last_updated: "2026-05-27T17:31:37.109Z"
+last_updated: "2026-05-27T17:35:27.365Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 35
-  completed_plans: 31
+  completed_plans: 32
   percent: 83
 ---
 
