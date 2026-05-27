@@ -1,0 +1,25 @@
+# STAGING ONLY — do NOT use this Caddyfile in production.
+#
+# Let's Encrypt staging issues certificates from an untrusted CA:
+#   - Browsers will show a "Your connection is not private" warning.
+#   - The certificate is NOT valid for real traffic.
+#
+# Use staging during DNS / config validation to avoid burning Let's Encrypt
+# production rate limits (5 duplicate certificates per registered domain per week).
+# Once staging succeeds, switch back to the production Caddyfile (no overlay).
+#
+# Apply via:
+#   docker compose -f docker-compose.yml -f compose.staging.yml up -d
+
+{
+    # Redirect ACME challenges to the Let's Encrypt staging environment.
+    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+    email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN} {
+    reverse_proxy auto-merge:3000
+
+    # Strip the upstream Server header to avoid leaking Caddy version info (T-11-18).
+    header -Server
+}

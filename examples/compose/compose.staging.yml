@@ -1,0 +1,27 @@
+# Compose overlay — swaps the production Caddyfile for the LE staging variant.
+#
+# Apply on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f compose.staging.yml up -d
+#
+# Caddyfile.staging points acme_ca at the Let's Encrypt staging environment,
+# which issues untrusted certs but has 10x higher rate limits — safe for
+# repeated DNS / TLS config testing without risking the production rate limit.
+#
+# Remove the -f compose.staging.yml flag when switching to production.
+
+services:
+  caddy:
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      # Compose volume lists are REPLACED (not merged) when using an overlay file.
+      # Without re-declaring caddy_data and caddy_config here, the staging caddy
+      # container would lose its persistent volume mounts and re-acquire LE certs
+      # on every restart — quickly exhausting even the staging rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+
+# Named volumes must be declared at the top-level even in overlay files; Compose
+# requires declarations to match across all compose files in a project.
+volumes:
+  caddy_data:
+  caddy_config:
