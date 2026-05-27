@@ -133,7 +133,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
   6. README имеет три пути установки (Manifest+Compose+Caddy / Helm / PaaS), DNS-first warning, troubleshooting секцию и ссылки на `/diagnose`
 **Plans**: 6 plans
 - [x] 11-01-PLAN.md — REL-08 base64 PEM decode in src/env.ts + unit/e2e tests
-- [ ] 11-02-PLAN.md — .github/workflows/release.yml multi-arch GHCR + cosign keyless + SLSA provenance + SBOM
+- [x] 11-02-PLAN.md — .github/workflows/release.yml multi-arch GHCR + cosign keyless + SLSA provenance + SBOM
 - [ ] 11-03-PLAN.md — Helm chart (single-replica fail-guard + existingSecretName + pod security)
 - [ ] 11-04-PLAN.md — examples/compose/ Compose + Caddy template with LE staging overlay
 - [ ] 11-05-PLAN.md — examples/paas/ Fly.io + Render.com Blueprint templates
@@ -153,7 +153,7 @@ See [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md) for full details.
 | 8. App Manifest flow | v1.1 | 0/6 | Planned | - |
 | 9. Onboarding webhook + PR-bot | v1.1 | 9/10 | In Progress|  |
 | 10. Diagnose endpoint | v1.1 | 4/5 | In Progress|  |
-| 11. Release artifacts | v1.1 | 1/6 | In Progress|  |
+| 11. Release artifacts | v1.1 | 2/6 | In Progress|  |
 
 ---
 

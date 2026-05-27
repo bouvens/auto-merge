@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Onboarding & Bootstrap
-status: executing
-last_updated: "2026-05-24T12:21:02.383Z"
-last_activity: 2026-05-24
+status: verifying
+last_updated: "2026-05-27T17:31:37.109Z"
+last_activity: 2026-05-27
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 29
-  completed_plans: 29
+  total_plans: 35
+  completed_plans: 31
   percent: 83
 ---
 
@@ -27,8 +27,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-22 after v1.0 close)
 
 Phase: 10 (diagnose-endpoint) — COMPLETED
 Plan: 5 of 5 — done
-Status: Phase complete; ready for verifier
-Last activity: 2026-05-24
+Status: Phase complete — ready for verification
+Last activity: 2026-05-27
 
 ## Last Milestone
 

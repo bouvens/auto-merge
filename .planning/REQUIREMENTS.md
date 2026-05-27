@@ -36,8 +36,8 @@
 
 ### Release Artifacts
 
-- [ ] **REL-01**: GitHub Actions release workflow `.github/workflows/release.yml` — trigger на `push` тэгов `v*.*.*`, публикует multi-arch (amd64 + arm64) образ в `ghcr.io/<owner>/auto-merge:<semver>`, `:latest`, `:sha-<7>` через `docker/build-push-action@v7.2.0` + `docker/setup-buildx-action@v3` + `docker/setup-qemu-action@v3`
-- [ ] **REL-02**: Image attestations — `provenance: true` (SLSA build provenance) + `sbom: true` (SPDX SBOM) встроены в release.yml; cosign keyless OIDC signing через `sigstore/cosign-installer@v3` с `id-token: write` permission
+- [x] **REL-01**: GitHub Actions release workflow `.github/workflows/release.yml` — trigger на `push` тэгов `v*.*.*`, публикует multi-arch (amd64 + arm64) образ в `ghcr.io/<owner>/auto-merge:<semver>`, `:latest`, `:sha-<7>` через `docker/build-push-action@v7.2.0` + `docker/setup-buildx-action@v3` + `docker/setup-qemu-action@v3`
+- [x] **REL-02**: Image attestations — `provenance: true` (SLSA build provenance) + `sbom: true` (SPDX SBOM) встроены в release.yml; cosign keyless OIDC signing через `sigstore/cosign-installer@v3` с `id-token: write` permission
 - [ ] **REL-03**: Helm chart в `deploy/helm/auto-merge/` — `Chart.yaml` (apiVersion v2), `values.yaml`, шаблоны: `deployment.yaml`, `service.yaml`, `ingress.yaml`, `serviceaccount.yaml`. **HARD GUARD:** `replicaCount: 1` с `fail` если оператор задаёт больше (in-memory cascade lock не поддерживает multi-replica)
 - [ ] **REL-04**: Helm secret management — `existingSecretName` reference вместо inline (no `PRIVATE_KEY` в `values.yaml`); поддержка external-secrets pattern через `envFrom.secretRef`; webhook secret / Slack URL / Telegram token — все через secret references
 - [ ] **REL-05**: Helm pod spec — `terminationGracePeriodSeconds: 60` (соответствует SHUTDOWN_TIMEOUT_MS), readinessProbe на `/readyz`, livenessProbe на `/healthz`, `runAsNonRoot: true`, `runAsUser: 1000` (matches Dockerfile)
@@ -100,8 +100,8 @@
 | DIAG-05 | Phase 6 | Pending |
 | DIAG-06 | Phase 6 | Pending |
 | DIAG-07 | Phase 6 | Pending |
-| REL-01 | Phase 11 | Pending |
-| REL-02 | Phase 11 | Pending |
+| REL-01 | Phase 11 | Complete |
+| REL-02 | Phase 11 | Complete |
 | REL-03 | Phase 11 | Pending |
 | REL-04 | Phase 11 | Pending |
 | REL-05 | Phase 11 | Pending |
