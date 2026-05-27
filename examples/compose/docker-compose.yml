@@ -1,0 +1,78 @@
+# Compose Spec — no "version" key (deprecated since Compose v2).
+# Usage:
+#   cp .env.example .env && chmod 600 .env
+#   # Edit .env with real values
+#   docker compose up -d
+#
+# For Let's Encrypt staging (avoids rate-limits during DNS / config validation):
+#   docker compose -f docker-compose.yml -f compose.staging.yml up -d
+
+services:
+  auto-merge:
+    # Pin a semver tag in production — :latest causes silent drift; verify with cosign before pulling:
+    #   cosign verify ghcr.io/OWNER/auto-merge:v1.1.0 \
+    #     --certificate-identity-regexp "https://github.com/OWNER/auto-merge/.*" \
+    #     --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+    image: ghcr.io/OWNER/auto-merge:v1.1.0
+    restart: unless-stopped
+    # auto-merge is only reachable via the caddy reverse proxy; port 3000 is not
+    # published to the host (expose vs ports) to keep the attack surface minimal.
+    expose:
+      - "3000"
+    environment:
+      APP_ID: "${APP_ID}"
+      WEBHOOK_SECRET: "${WEBHOOK_SECRET}"
+      # Paste raw PEM or base64-encoded PEM — decodeMaybeBase64Pem handles both at boot (REL-08).
+      PRIVATE_KEY: "${PRIVATE_KEY}"
+      NODE_ENV: "production"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      # Optional — remove if not using Slack notifications.
+      SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
+      # Optional — remove if not using Telegram notifications.
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_DEFAULT_CHAT_ID: "${TELEGRAM_DEFAULT_CHAT_ID:-}"
+      # Optional — token for the /diagnose endpoint; omit to disable the endpoint.
+      DIAGNOSE_TOKEN: "${DIAGNOSE_TOKEN:-}"
+    # Compose reads .env from the working directory automatically.
+    # Healthcheck duplicates the Dockerfile HEALTHCHECK because orchestrators
+    # (Compose, Swarm, some k8s bridges) rely on the service-level declaration
+    # rather than the image-level metadata.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    # 65s exceeds the default SHUTDOWN_TIMEOUT (30 000 ms) with a comfortable buffer
+    # so Compose sends SIGTERM and waits long enough for in-flight webhooks to drain.
+    stop_grace_period: 65s
+    depends_on:
+      caddy:
+        condition: service_started
+
+  caddy:
+    image: caddy:2.11.3-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      # UDP port 443 is required for HTTP/3 (QUIC).
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # MUST be named volumes — anonymous volumes are recreated on `docker compose down`,
+      # which would cause Caddy to re-request Let's Encrypt certificates on the next start.
+      # LE production rate-limit is 5 duplicate-cert issuances per week; hitting it locks out
+      # your domain for up to 7 days (Pitfall 5 in RESEARCH).
+      # NEVER run `docker compose down -v` in production — the -v flag removes named volumes.
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: "${DOMAIN}"
+      ACME_EMAIL: "${ACME_EMAIL:-admin@example.com}"
+
+# Named volumes persist across container restarts and `docker compose down` (without -v).
+# See caddy service comment above for why this is critical.
+volumes:
+  caddy_data:
+  caddy_config:

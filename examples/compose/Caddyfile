@@ -1,0 +1,19 @@
+# Caddyfile for auto-merge self-hosted deployment.
+#
+# {$VAR:default} is Caddy's env-templating syntax — Caddy reads OS environment
+# variables at startup, not on hot-reload. To apply env changes, restart the container.
+#
+# Required env vars: DOMAIN, ACME_EMAIL (falls back to admin@example.com).
+# These are set in the caddy service environment block in docker-compose.yml.
+
+{
+    # Let's Encrypt will send expiry notifications to this address.
+    email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN} {
+    reverse_proxy auto-merge:3000
+
+    # Strip the upstream Server header to avoid leaking Caddy version info (T-11-18).
+    header -Server
+}

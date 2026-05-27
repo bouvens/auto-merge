@@ -4,6 +4,8 @@ dist
 coverage
 .env
 .env.*
+# Allow example env templates committed to the repo (no real secrets, just placeholders).
+!**/.env.example
 *.pem
 *.key
 *.crt
