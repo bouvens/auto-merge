@@ -43,17 +43,25 @@ afterEach(() => {
   vi.resetModules();
 });
 
-function fakeOctokitFactory() {
-  // Mocked Octokit minimal surface — initBotIdentity only calls .request().
+function fakeAppOctokit() {
   return {
     request: vi.fn(async (route: string) => {
       if (route === "GET /app") {
         return { data: { slug: "my-app", id: 1234 } };
       }
+      throw new Error(`appOctokit only serves GET /app, got ${route}`);
+    }),
+    // biome-ignore lint/suspicious/noExplicitAny: test fake doesn't model full Octokit
+  } as any;
+}
+
+function fakePublicOctokit() {
+  return {
+    request: vi.fn(async (route: string) => {
       if (route.startsWith("GET /users/")) {
         return { data: { id: 41898282, login: "my-app[bot]" } };
       }
-      throw new Error(`unexpected route ${route}`);
+      throw new Error(`publicOctokit only serves GET /users/{username}, got ${route}`);
     }),
     // biome-ignore lint/suspicious/noExplicitAny: test fake doesn't model full Octokit
   } as any;
@@ -69,12 +77,28 @@ describe("getBotIdentity", () => {
 describe("initBotIdentity", () => {
   it("composes login and lowercase noreply email from bot user_id (NOT app.id)", async () => {
     const { initBotIdentity, getBotIdentity } = await import("../../src/auth.js");
-    await initBotIdentity(makeEnv(), fakeOctokitFactory);
+    await initBotIdentity(makeEnv(), fakeAppOctokit, fakePublicOctokit);
     const identity = getBotIdentity();
     expect(identity.login).toBe("my-app[bot]");
     // Critical: bot user_id (41898282), not app.id (1234) — RESEARCH.md Pitfall 1.
     expect(identity.email).toBe("41898282+my-app[bot]@users.noreply.github.com");
     expect(identity.email).toBe(identity.email.toLowerCase());
+  });
+
+  it("uses the public (unauthenticated) Octokit for GET /users/{username}", async () => {
+    const { initBotIdentity, getBotIdentity } = await import("../../src/auth.js");
+    const appOk = fakeAppOctokit();
+    const publicOk = fakePublicOctokit();
+    await initBotIdentity(
+      makeEnv(),
+      () => appOk,
+      () => publicOk,
+    );
+    expect(appOk.request).toHaveBeenCalledWith("GET /app");
+    expect(publicOk.request).toHaveBeenCalledWith("GET /users/{username}", {
+      username: "my-app[bot]",
+    });
+    expect(getBotIdentity().login).toBe("my-app[bot]");
   });
 });
 

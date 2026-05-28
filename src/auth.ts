@@ -59,23 +59,27 @@ export async function readyzCheck(): Promise<{ ok: boolean; reason?: string }> {
   }
 }
 
-// app.id is the App ID, NOT the bot user_id needed for the noreply email — must fetch via GET /users/{slug}[bot] (D-16, RESEARCH.md Pitfall 1).
+// Noreply email needs bot user_id (from GET /users/{slug}[bot]), not app.id from GET /app.
 export async function initBotIdentity(
   env: Env,
-  octokitFactory?: () => InstanceType<typeof Octokit>,
+  appOctokitFactory?: () => InstanceType<typeof Octokit>,
+  publicOctokitFactory?: () => InstanceType<typeof Octokit>,
 ): Promise<void> {
-  const octokit =
-    octokitFactory?.() ??
+  // GET /app accepts app JWT without installationId; other routes require installation auth.
+  const appOctokit =
+    appOctokitFactory?.() ??
     new Octokit({
       authStrategy: createAppAuth,
       auth: { appId: env.APP_ID, privateKey: env.PRIVATE_KEY },
     });
 
-  const appResp = await octokit.request("GET /app");
+  const appResp = await appOctokit.request("GET /app");
   const slug = (appResp.data as { slug: string }).slug;
   const login = `${slug}[bot]`;
 
-  const userResp = await octokit.request("GET /users/{username}", {
+  // GET /users/{username} is public; app-auth hook would force installation auth here and crash.
+  const publicOctokit = publicOctokitFactory?.() ?? new Octokit();
+  const userResp = await publicOctokit.request("GET /users/{username}", {
     username: login,
   });
   const botUserId = (userResp.data as { id: number }).id;

@@ -11,3 +11,4 @@ coverage
 *.crt
 .DS_Store
 *.log
+.idea/
