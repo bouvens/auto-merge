@@ -40,6 +40,7 @@ describe("setup/manifestSchema.buildManifest", () => {
       pull_requests: "write",
       checks: "write",
       metadata: "read",
+      administration: "read",
     });
   });
 
