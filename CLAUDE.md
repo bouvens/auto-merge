@@ -12,7 +12,7 @@ Self-hostable GitHub App для автоматического каскадно�
 - **Tech stack**: Node.js + TypeScript — стандартный путь для GitHub Apps (Octokit, Probot экосистема), масса библиотек, типобезопасность
 - **Hosting**: Self-host Docker — один образ должен подниматься на любом VPS / k8s одной командой `docker run`, без managed-зависимостей
 - **Security**: GitHub App не имеет доступа к репо-Secrets (это ограничение GitHub) — поэтому Slack/Telegram bot tokens принципиально лежат в env инстанса App, а не в репо
-- **Permissions (GitHub App)**: минимальные — `contents: write` (для merge/push), `pull_requests: write` (создавать PR при конфликтах), `checks: write` (Check Runs), `metadata: read`. Никаких `admin`, `secrets`, `actions: write`
+- **Permissions (GitHub App)**: минимальные — `contents: write` (merge/push), `pull_requests: write` (PR при конфликтах), `checks: write` (Check Runs), `metadata: read`, `administration: read` (pre-flight по branch protection rules перед merge). Никаких `administration: write`, `secrets`, `actions: write`
 - **Operations**: без переписывания истории, без force-push, без `--no-verify` — merge должен выглядеть как обычный merge commit
 - **Compatibility**: каскад v1 — линейная цепочка до 3 звеньев (main → [release] → dev); расширение графа — следующая веха
 - **Auditability**: каждое действие App видно либо как commit в target-ветке, либо как Check Run, либо как PR — никаких «тихих» операций

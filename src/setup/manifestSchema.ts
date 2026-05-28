@@ -13,12 +13,13 @@ export interface Manifest {
 
 type ManifestEnv = Pick<Env, "SETUP_APP_NAME" | "SETUP_PUBLIC_URL">;
 
-// Locked scope: minimum permissions for cascade merge; broader scopes are forbidden by project constraints.
+// Minimum permissions for cascade merge; administration:read powers the branch-protection pre-flight before each merge.
 const DEFAULT_PERMISSIONS: Record<string, string> = {
   contents: "write",
   pull_requests: "write",
   checks: "write",
   metadata: "read",
+  administration: "read",
 };
 
 const DEFAULT_EVENTS: string[] = [
