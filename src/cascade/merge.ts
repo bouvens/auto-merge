@@ -194,6 +194,19 @@ export async function mergeStep(deps: MergeStepDeps, opts: MergeStepOpts): Promi
       check_run_id: null,
     };
   }
+  if ("plan_unavailable" in protection && protection.plan_unavailable) {
+    // Branch protection isn't available on this plan, so the target is provably unprotected.
+    log.info(
+      {
+        ...logCtx,
+        endpoint: "branches_protection",
+        status: protection.status,
+        upstream_message: protection.message,
+        event: "cascade_protection_check_unavailable",
+      },
+      "cascade",
+    );
+  }
   if ("blocked" in protection && protection.blocked) {
     return {
       outcome: "protection_blocked",
