@@ -473,4 +473,7 @@ Pull requests welcome. Open an issue first for significant changes.
 
 ## License
 
-[MIT](LICENSE)
+[Business Source License 1.1](LICENSE). On 2031-05-28 the license automatically
+converts to Apache License 2.0. Production use within your own organization is
+permitted; offering auto-merge or a derivative work as a hosted or managed
+service to third parties is not.

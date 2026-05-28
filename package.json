@@ -2,6 +2,7 @@
   "name": "auto-merge",
   "version": "0.1.0",
   "description": "Self-hostable GitHub App for automatic cascade merging: main → release → dev",
+  "license": "BUSL-1.1",
   "type": "module",
   "private": true,
   "engines": {
