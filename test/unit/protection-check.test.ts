@@ -35,7 +35,7 @@ describe("protectionCheck", () => {
     const message = "Upgrade to GitHub Team or a paid plan to use this feature.";
     const req = vi.fn().mockRejectedValueOnce({ status: 403, response: { data: { message } } });
     const result = await protectionCheck(makeDeps(req), "release");
-    expect("plan_unavailable" in result && result.plan_unavailable).toBe(true);
+    expect(result).toEqual({ plan_unavailable: true, status: 403, message });
   });
 
   it("non-403/404 status re-throws", async () => {
