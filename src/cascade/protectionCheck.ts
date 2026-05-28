@@ -11,7 +11,8 @@ export type BlockingRule =
 export type ProtectionResult =
   | { blocked: false }
   | { blocked: true; rules: BlockingRule[] }
-  | { permission_error: true; status: 403 };
+  | { permission_error: true; status: 403 }
+  | { plan_unavailable: true; status: 403; message: string };
 
 interface ProtectionResponse {
   required_pull_request_reviews?: {
@@ -62,7 +63,17 @@ export async function protectionCheck(
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 404) return { blocked: false };
-    if (status === 403) return { permission_error: true, status: 403 };
+    if (status === 403) {
+      // Free-plan private repos return 403 on this endpoint — feature is billing-gated, not permission.
+      const message =
+        ((err as { response?: { data?: { message?: string } } }).response?.data?.message ??
+          (err as Error).message ??
+          "") + "";
+      if (/upgrade to github (pro|team)|paid (plan|subscription)/i.test(message)) {
+        return { plan_unavailable: true, status: 403, message };
+      }
+      return { permission_error: true, status: 403 };
+    }
     throw err;
   }
 }

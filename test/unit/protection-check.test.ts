@@ -24,6 +24,20 @@ describe("protectionCheck", () => {
     expect(result).toEqual({ permission_error: true, status: 403 });
   });
 
+  it("403 with Upgrade-to-Pro message → plan_unavailable (free-plan private repo)", async () => {
+    const message = "Upgrade to GitHub Pro or make this repository public to enable this feature.";
+    const req = vi.fn().mockRejectedValueOnce({ status: 403, response: { data: { message } } });
+    const result = await protectionCheck(makeDeps(req), "release");
+    expect(result).toEqual({ plan_unavailable: true, status: 403, message });
+  });
+
+  it("403 with Upgrade-to-Team message → plan_unavailable", async () => {
+    const message = "Upgrade to GitHub Team or a paid plan to use this feature.";
+    const req = vi.fn().mockRejectedValueOnce({ status: 403, response: { data: { message } } });
+    const result = await protectionCheck(makeDeps(req), "release");
+    expect("plan_unavailable" in result && result.plan_unavailable).toBe(true);
+  });
+
   it("non-403/404 status re-throws", async () => {
     const req = vi.fn().mockRejectedValueOnce({ status: 500 });
     await expect(protectionCheck(makeDeps(req), "release")).rejects.toMatchObject({ status: 500 });
