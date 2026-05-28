@@ -1,5 +1,5 @@
 # fly.toml — auto-merge deployment config for Fly.io
-# Run `flyctl deploy --image ghcr.io/OWNER/auto-merge:vX.Y.Z` — no local build required.
+# Run `flyctl deploy --image ghcr.io/OWNER/auto-merge:X.Y.Z` — no local build required.
 
 app = "auto-merge"   # Replace with your fly app slug (must be globally unique on fly.io)
 primary_region = "iad"   # Pick a region close to GitHub's webhook origin (us-east is fastest)

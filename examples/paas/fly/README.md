@@ -50,7 +50,7 @@ fly secrets set PRIVATE_KEY="$(cat ./app-key.pem | base64 | tr -d '\n')"
 Before deploying, verify the image was built by the official release workflow:
 
 ```bash
-cosign verify ghcr.io/OWNER/auto-merge:v1.1.0 \
+cosign verify ghcr.io/OWNER/auto-merge:1.1.0 \
   --certificate-identity-regexp "https://github.com/OWNER/auto-merge/.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
@@ -61,7 +61,7 @@ See the main README for full supply-chain verification details.
 ## Step 4 — Deploy
 
 ```bash
-flyctl deploy --image ghcr.io/OWNER/auto-merge:v1.1.0 --config examples/paas/fly/fly.toml
+flyctl deploy --image ghcr.io/OWNER/auto-merge:1.1.0 --config examples/paas/fly/fly.toml
 ```
 
 Replace `OWNER` and the tag with the actual values. The first deploy takes ~2 minutes.

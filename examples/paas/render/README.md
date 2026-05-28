@@ -51,7 +51,7 @@ double-encoding causes `no start line` errors in Probot.
 Before applying the Blueprint, verify the image was built by the official release workflow:
 
 ```bash
-cosign verify ghcr.io/OWNER/auto-merge:v1.1.0 \
+cosign verify ghcr.io/OWNER/auto-merge:1.1.0 \
   --certificate-identity-regexp "https://github.com/OWNER/auto-merge/.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```

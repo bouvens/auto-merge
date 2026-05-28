@@ -187,7 +187,7 @@ The signature proves the image originated from this repository's CI workflow and
 not tampered with after build.
 
 ```bash
-cosign verify ghcr.io/OWNER/auto-merge:v1.1.0 \
+cosign verify ghcr.io/OWNER/auto-merge:1.1.0 \
   --certificate-identity-regexp "https://github.com/OWNER/auto-merge/.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```

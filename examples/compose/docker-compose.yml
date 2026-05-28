@@ -10,10 +10,10 @@
 services:
   auto-merge:
     # Pin a semver tag in production — :latest causes silent drift; verify with cosign before pulling:
-    #   cosign verify ghcr.io/OWNER/auto-merge:v1.1.0 \
+    #   cosign verify ghcr.io/OWNER/auto-merge:1.1.0 \
     #     --certificate-identity-regexp "https://github.com/OWNER/auto-merge/.*" \
     #     --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-    image: ghcr.io/OWNER/auto-merge:v1.1.0
+    image: ghcr.io/OWNER/auto-merge:1.1.0
     restart: unless-stopped
     # auto-merge is only reachable via the caddy reverse proxy; port 3000 is not
     # published to the host (expose vs ports) to keep the attack surface minimal.

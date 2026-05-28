@@ -5,7 +5,7 @@ services:
     image:
       # Pin a semver tag in production — :latest causes silent redeploy on every
       # Render image-refresh cycle and makes rollbacks ambiguous (RESEARCH Anti-Patterns).
-      url: ghcr.io/OWNER/auto-merge:v1.1.0   # replace OWNER and bump tag via PR before each upgrade
+      url: ghcr.io/OWNER/auto-merge:1.1.0   # replace OWNER and bump tag via PR before each upgrade
     plan: starter   # Starter is the floor that allows persistent IPs; downgrade to free only for staging
     region: oregon   # Change to a region close to GitHub's webhook origin for lower latency
     healthCheckPath: /healthz
