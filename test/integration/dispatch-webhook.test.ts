@@ -96,7 +96,11 @@ beforeAll(async () => {
 
   probot = createProbot(env);
   await probot.ready();
-  await initBotIdentity(env, () => new Octokit({ baseUrl: "https://api.github.com" }));
+  await initBotIdentity(
+    env,
+    () => new Octokit({ baseUrl: "https://api.github.com" }),
+    () => new Octokit({ baseUrl: "https://api.github.com" }),
+  );
 
   processedJobs = [];
   const runCascade = makeRunCascade({ notify: new NoopChannel() });

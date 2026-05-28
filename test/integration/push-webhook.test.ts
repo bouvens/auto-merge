@@ -112,8 +112,12 @@ beforeAll(async () => {
 
   probot = createProbot(env);
   await probot.ready();
-  // Plain Octokit factory — auth-app installation auth would fail without installationId on the /users/:slug[bot] call (msw intercepts both endpoints regardless of auth).
-  await initBotIdentity(env, () => new Octokit({ baseUrl: "https://api.github.com" }));
+  // Both factories pinned to api.github.com to make MSW handler routing explicit.
+  await initBotIdentity(
+    env,
+    () => new Octokit({ baseUrl: "https://api.github.com" }),
+    () => new Octokit({ baseUrl: "https://api.github.com" }),
+  );
   botLogin = `${harness.state.appSlug}[bot]`;
 
   enqueued = [];
