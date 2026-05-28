@@ -34,10 +34,7 @@ import { createMultiQueue } from "./webhook/multiQueue.js";
 
 const env = loadEnv();
 const appLog = initLogger(env);
-// R-2: must complete before app.listen() so first webhook sees a populated default. Fail-fast on missing/invalid file mirrors loadEnv() symmetry.
-initDefaultConfigLoader(env, appLog);
 
-// D-04: stale cleanup runs before listen so a leftover credentials.env from a crashed setup never survives a restart.
 let credentialsStore: CredentialsStore | undefined;
 if (env.SETUP_ENABLED) {
   mkdirSync(env.SETUP_OUTPUT_DIR, { recursive: true });
@@ -47,99 +44,114 @@ if (env.SETUP_ENABLED) {
 
 let app: FastifyInstance | undefined;
 let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>> | undefined;
-// cronHandle stored at module scope so shutdown handler can call cronHandle?.stop() before drain.
 let cronHandle: { stop: () => Promise<void> } | undefined;
 
 try {
-  const probot = createProbot(env);
-
-  // Probot 14 initialises .webhooks asynchronously — must await before webhooks are usable (D-23)
-  await probot.ready();
-  await initBotIdentity(env);
-  attachWebhookErrorRedactor(probot);
-
-  const channels: NotificationChannel[] = [];
-  if (env.SLACK_WEBHOOK_URL) {
-    channels.push(
-      new SlackChannel({
-        webhookUrl: env.SLACK_WEBHOOK_URL,
-        env,
-        getConfig: (repo) => {
-          const [owner, repoName] = repo.split("/");
-          return getRepoConfig(owner ?? "", repoName ?? "");
-        },
-      }),
+  if (env._setupOnly) {
+    appLog.info(
+      { mode: "setup-only", setup_url: env.SETUP_PUBLIC_URL },
+      "boot — credentials missing; serving /setup/* only until manifest flow completes",
     );
-  }
-  if (env.TELEGRAM_BOT_TOKEN) {
-    channels.push(
-      new TelegramChannel({
-        botToken: env.TELEGRAM_BOT_TOKEN,
-        env,
-        getConfig: (repo) => {
-          const [owner, repoName] = repo.split("/");
-          return getRepoConfig(owner ?? "", repoName ?? "");
-        },
-      }),
-    );
-  }
-  // D-20: suppressionCheck routes onboarding-tagged installation IDs away from user channels.
-  const notify = new MultiChannel(channels, { suppressionCheck: (id) => isOnboarding(id) });
 
-  multiQueue = createMultiQueue<CascadeJob>({
-    perKeyMax: env.WEBHOOK_QUEUE_PER_KEY_MAX,
-    globalMax: env.WEBHOOK_QUEUE_MAX,
-    handler: makeRunCascade({ notify }),
-    notify,
-  });
+    const healthChecker = createNotifyHealthChecker(env);
+    app = await buildServer({
+      env,
+      log: appLog,
+      // Setup-only readyz never reaches "ready" — k8s should not route webhooks here yet.
+      readyzFn: async () => ({ ok: false, reason: "setup-only-mode" }),
+      credentials: credentialsStore,
+      healthChecker,
+    });
+    await app.listen({ port: env.PORT, host: "0.0.0.0" });
+    appLog.info({ port: env.PORT, mode: "setup-only" }, "listening");
+  } else {
+    initDefaultConfigLoader(env, appLog);
 
-  // D-29: canonical onboarding wiring — octokitFactory injected via Plan 09-02 retry wrapper.
-  const onboarding = createOnboardingHandlers({
-    octokitFactory: getInstallationOctokitWithRetry,
-    multiQueue,
-    env,
-  });
+    const probot = createProbot(env);
+    // Probot 14 initialises .webhooks asynchronously (D-23).
+    await probot.ready();
+    await initBotIdentity(env);
+    attachWebhookErrorRedactor(probot);
 
-  cronHandle = await startCron({ env, multiQueue, log: appLog });
+    const channels: NotificationChannel[] = [];
+    if (env.SLACK_WEBHOOK_URL) {
+      channels.push(
+        new SlackChannel({
+          webhookUrl: env.SLACK_WEBHOOK_URL,
+          env,
+          getConfig: (repo) => {
+            const [owner, repoName] = repo.split("/");
+            return getRepoConfig(owner ?? "", repoName ?? "");
+          },
+        }),
+      );
+    }
+    if (env.TELEGRAM_BOT_TOKEN) {
+      channels.push(
+        new TelegramChannel({
+          botToken: env.TELEGRAM_BOT_TOKEN,
+          env,
+          getConfig: (repo) => {
+            const [owner, repoName] = repo.split("/");
+            return getRepoConfig(owner ?? "", repoName ?? "");
+          },
+        }),
+      );
+    }
+    const notify = new MultiChannel(channels, { suppressionCheck: (id) => isOnboarding(id) });
 
-  // D-05/D-06 — boot-time reachability probe with TTL cache; lazy refresh + strict-mode gating live here.
-  const healthChecker = createNotifyHealthChecker(env);
+    multiQueue = createMultiQueue<CascadeJob>({
+      perKeyMax: env.WEBHOOK_QUEUE_PER_KEY_MAX,
+      globalMax: env.WEBHOOK_QUEUE_MAX,
+      handler: makeRunCascade({ notify }),
+      notify,
+    });
 
-  const notifyHealthy = (s: NotifyStatus): boolean => s === "ok" || s === "n/a";
-  const wrappedReadyz = async (): Promise<{
-    ok: boolean;
-    reason?: string;
-    body?: Record<string, unknown>;
-  }> => {
-    const auth = await readyzCheck();
-    const notify = healthChecker.getStatus();
-    const strict = env.NOTIFY_HEALTHCHECK_REQUIRED;
-    const notifyOk = !strict || (notifyHealthy(notify.slack) && notifyHealthy(notify.telegram));
-    return {
-      ok: auth.ok && notifyOk,
-      reason: !auth.ok ? auth.reason : !notifyOk ? "notify-unreachable" : undefined,
-      body: { notify_status: notify },
+    const onboarding = createOnboardingHandlers({
+      octokitFactory: getInstallationOctokitWithRetry,
+      multiQueue,
+      env,
+    });
+
+    cronHandle = await startCron({ env, multiQueue, log: appLog });
+
+    const healthChecker = createNotifyHealthChecker(env);
+    const notifyHealthy = (s: NotifyStatus): boolean => s === "ok" || s === "n/a";
+    const wrappedReadyz = async (): Promise<{
+      ok: boolean;
+      reason?: string;
+      body?: Record<string, unknown>;
+    }> => {
+      const auth = await readyzCheck();
+      const notify = healthChecker.getStatus();
+      const strict = env.NOTIFY_HEALTHCHECK_REQUIRED;
+      const notifyOk = !strict || (notifyHealthy(notify.slack) && notifyHealthy(notify.telegram));
+      return {
+        ok: auth.ok && notifyOk,
+        reason: !auth.ok ? auth.reason : !notifyOk ? "notify-unreachable" : undefined,
+        body: { notify_status: notify },
+      };
     };
-  };
 
-  app = await buildServer({
-    env,
-    log: appLog,
-    readyzFn: wrappedReadyz,
-    probot,
-    dedup,
-    queue: multiQueue,
-    notify,
-    onboarding,
-    credentials: credentialsStore,
-    healthChecker,
-    getAppOctokit,
-    getInstallationOctokit,
-  });
-  await app.listen({ port: env.PORT, host: "0.0.0.0" });
-  // AFTER listen so 3s × N probes never delay readiness for k8s rolling restart.
-  void healthChecker.refresh();
-  appLog.info({ port: env.PORT }, "listening");
+    app = await buildServer({
+      env,
+      log: appLog,
+      readyzFn: wrappedReadyz,
+      probot,
+      dedup,
+      queue: multiQueue,
+      notify,
+      onboarding,
+      credentials: credentialsStore,
+      healthChecker,
+      getAppOctokit,
+      getInstallationOctokit,
+    });
+    await app.listen({ port: env.PORT, host: "0.0.0.0" });
+    // AFTER listen so 3s × N probes never delay readiness for k8s rolling restart.
+    void healthChecker.refresh();
+    appLog.info({ port: env.PORT }, "listening");
+  }
 } catch (e) {
   appLog.fatal({ err: e }, "boot-failed");
   process.exit(1);

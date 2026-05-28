@@ -10,19 +10,38 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
-# REQUIRED. Name of a pre-existing Kubernetes Secret that contains all secrets
-# the app needs at startup:
+# Name of a pre-existing Kubernetes Secret with the app's env vars.
+# Optional if persistence.enabled=true (zero-touch install — boot in setup-only mode,
+# /setup/new writes credentials.env to the PVC, pod self-restarts).
+# When provided, the Secret should contain:
 #   APP_ID         — GitHub App numeric ID
 #   WEBHOOK_SECRET — webhook HMAC secret (min 16 chars)
-#   PRIVATE_KEY    — RSA private key PEM (raw or base64-encoded; REL-08 decodes both)
-# Optional entries in the same Secret:
+#   PRIVATE_KEY    — RSA private key PEM (raw or base64-encoded; decodeMaybeBase64Pem handles both)
+# Optional entries:
 #   PRIVATE_KEY_PATH       — path to a mounted PEM file (alternative to PRIVATE_KEY)
 #   SLACK_WEBHOOK_URL      — Slack incoming webhook URL
 #   TELEGRAM_BOT_TOKEN     — Telegram bot token (min 40 chars)
 #   TELEGRAM_DEFAULT_CHAT_ID
 #   DIAGNOSE_TOKEN         — bearer token for /diagnose endpoint
-# Set via: helm install auto-merge ./deploy/helm/auto-merge --set existingSecretName=<name>
 existingSecretName: ""
+
+# Persistent volume for credentials.env written by /setup/new manifest flow.
+# Required for the zero-touch install path: deploy without existingSecretName,
+# complete setup in browser, pod self-restarts and loads creds from the PVC.
+persistence:
+  enabled: false
+  mountPath: /app/data
+  size: 64Mi
+  accessMode: ReadWriteOnce
+  # Empty = cluster default StorageClass. Set explicitly for clusters with multiple SCs.
+  storageClass: ""
+
+# App-manifest setup flow. Enable for zero-touch install (manifest flow creates GitHub App + writes creds to PVC).
+# publicUrl MUST be your instance's externally-reachable URL — GitHub redirects the manifest callback there.
+setup:
+  enabled: false
+  publicUrl: ""
+  appName: "auto-merge"
 
 service:
   type: ClusterIP

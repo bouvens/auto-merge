@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type pino from "pino";
 import { getAnonymousOctokit } from "../auth.js";
 import type { Env } from "../env.js";
-import type { CredentialsPayload, CredentialsStore } from "./credentials.js";
+import { type CredentialsPayload, type CredentialsStore, parseEnvFile } from "./credentials.js";
 import {
   clearDownloadCookie,
   clearStateCookie,
@@ -204,6 +204,12 @@ export function registerManifestCallbackRoute(app: FastifyInstance, deps: Callba
         "setup",
       );
       payload = next;
+
+      // In setup-only boot, credentials.env is loaded only at startup — SIGTERM lets the orchestrator restart with creds.
+      if (deps.env._setupOnly) {
+        deps.log.info({ event: "setup_self_restart_scheduled" }, "setup");
+        setTimeout(() => process.kill(process.pid, "SIGTERM"), 2000).unref();
+      }
     }
 
     // Symmetrise refresh path with happy path by re-reading from disk; renderSuccessPage runs strictly AFTER persist (Pitfall 2 mitigation).
@@ -236,15 +242,9 @@ export function registerManifestCallbackRoute(app: FastifyInstance, deps: Callba
   });
 }
 
-// Minimal parser for refresh-path render — extracts APP_ID + slug-equivalent. PEM tail is computed from the quoted block; webhook tail from raw line.
 function parseCredentialsEnv(body: string): CredentialsPayload {
-  const idMatch = body.match(/^APP_ID=(\d+)/m);
-  const whMatch = body.match(/^WEBHOOK_SECRET=(.+)$/m);
-  const pemMatch = body.match(/^PRIVATE_KEY="([\s\S]+?)"/m);
-  const id = idMatch ? Number(idMatch[1]) : 0;
-  const webhook_secret = whMatch?.[1] ?? "";
-  const pem = pemMatch?.[1]?.replace(/\\"/g, '"') ?? "";
-  return { id, webhook_secret, pem };
+  const parsed = parseEnvFile(body);
+  return { id: parsed.id ?? 0, webhook_secret: parsed.webhook_secret ?? "", pem: parsed.pem ?? "" };
 }
 
 // Cookie-gated single-use download (D-17, T-08-22 / T-08-24). The first successful GET clears the cookie via Max-Age=0.

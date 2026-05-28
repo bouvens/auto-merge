@@ -34,9 +34,9 @@ export interface BuildServerDeps {
   credentials?: CredentialsStore;
   // D-18: mandatory — diagnose route registers unconditionally and always reads healthChecker.getStatus() for the notify section.
   healthChecker: NotifyHealthChecker;
-  // D-19: minted-on-demand App-JWT client for apps.getRepoInstallation (D-04); installation-scoped factory for downstream repo probes.
-  getAppOctokit: () => Octokit;
-  getInstallationOctokit: (installationId: number) => Promise<Octokit>;
+  // Absent in setup-only boot — diagnose route is skipped because it requires app auth.
+  getAppOctokit?: () => Octokit;
+  getInstallationOctokit?: (installationId: number) => Promise<Octokit>;
 }
 
 export async function buildServer(deps: BuildServerDeps) {
@@ -75,14 +75,16 @@ export async function buildServer(deps: BuildServerDeps) {
     return { status: "ready", ...result.body };
   });
 
-  // D-01 / D-18: registered unconditionally — 503-gate inside the handler covers the "DIAGNOSE_TOKEN unset" case so the route shape is stable for operator tooling.
-  registerDiagnoseRoute(app, {
-    env: deps.env,
-    log: deps.log,
-    appOctokit: deps.getAppOctokit(),
-    octokitFactory: deps.getInstallationOctokit,
-    healthChecker: deps.healthChecker,
-  });
+  // Diagnose requires app auth; in setup-only boot the route is absent so the operator gets 404 instead of an opaque 500.
+  if (deps.getAppOctokit && deps.getInstallationOctokit) {
+    registerDiagnoseRoute(app, {
+      env: deps.env,
+      log: deps.log,
+      appOctokit: deps.getAppOctokit(),
+      octokitFactory: deps.getInstallationOctokit,
+      healthChecker: deps.healthChecker,
+    });
+  }
 
   if (deps.probot && deps.dedup && deps.queue && deps.notify && deps.onboarding) {
     registerHandlers(deps.probot, { onboarding: deps.onboarding });

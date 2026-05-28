@@ -1,7 +1,7 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/core";
 import { Probot } from "probot";
-import type { Env } from "./env.js";
+import type { FullEnv } from "./env.js";
 import { log } from "./log.js";
 
 export function attachWebhookErrorRedactor(probot: Probot): void {
@@ -21,11 +21,11 @@ export function attachWebhookErrorRedactor(probot: Probot): void {
 // Probot's appAuth is not directly reachable; we mint our own for /readyz JWT signing.
 let appAuth: ReturnType<typeof createAppAuth> | undefined;
 // Boot env cached so getInstallationOctokit can mint installation-scoped clients without re-loading env (D-30).
-let bootEnv: Env | undefined;
+let bootEnv: FullEnv | undefined;
 // Bot identity resolved once at boot, used for loop-prevention in cascade engine (D-16, CASC-02).
 let botIdentity: { login: string; email: string } | undefined;
 
-export function createProbot(env: Env): Probot {
+export function createProbot(env: FullEnv): Probot {
   const probot = new Probot({
     appId: env.APP_ID,
     privateKey: env.PRIVATE_KEY,
@@ -61,7 +61,7 @@ export async function readyzCheck(): Promise<{ ok: boolean; reason?: string }> {
 
 // Noreply email needs bot user_id (from GET /users/{slug}[bot]), not app.id from GET /app.
 export async function initBotIdentity(
-  env: Env,
+  env: FullEnv,
   appOctokitFactory?: () => InstanceType<typeof Octokit>,
   publicOctokitFactory?: () => InstanceType<typeof Octokit>,
 ): Promise<void> {

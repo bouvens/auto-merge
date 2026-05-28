@@ -8,12 +8,33 @@ your team via Slack or Telegram the moment a conflict blocks the cascade.
 
 ## Quickstart
 
-1. Pick your deployment platform from the decision matrix below.
-2. Follow the corresponding install path (Compose + Caddy, Helm, or PaaS).
-3. Point the GitHub App webhook URL at your deployed instance.
+Two install modes — choose based on whether you already have a GitHub App you want to reuse.
 
-All three paths use the same container image and the same environment variables.
-The choice is operational, not functional.
+**Zero-touch (recommended for new installs):** deploy the container with no credentials and an empty
+volume. The pod starts in setup-only mode, exposes `/setup/new`, you click through GitHub's App
+Manifest flow once in a browser, and the app self-bootstraps. No manual `kubectl create secret`,
+no PEM copy-paste, no webhook secret to invent.
+
+```bash
+# Kubernetes (helm)
+helm install auto-merge ./deploy/helm/auto-merge \
+  --set image.repository=ghcr.io/OWNER/auto-merge \
+  --set image.tag=1.1.0 \
+  --set persistence.enabled=true \
+  --set setup.enabled=true \
+  --set setup.publicUrl=https://am.example.com \
+  --set ingress.enabled=true \
+  --set ingress.hosts[0].host=am.example.com
+
+# Open https://am.example.com/setup/new in a browser, complete the manifest flow,
+# pod self-restarts and runs in full mode. That's it.
+```
+
+For Compose, mount a named volume at `/app/data`, set `SETUP_ENABLED=true` + `SETUP_PUBLIC_URL`,
+omit `APP_ID`/`WEBHOOK_SECRET`/`PRIVATE_KEY` from the env file. Same browser flow.
+
+**Manual (existing GitHub App / secret pipeline):** create the App + secret yourself, pass them
+in via env. Pick a path below.
 
 ## Decision Matrix
 

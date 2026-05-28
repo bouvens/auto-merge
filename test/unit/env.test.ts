@@ -372,4 +372,90 @@ describe("loadEnv", () => {
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
+
+  describe("setup-only bootstrap mode", () => {
+    it("returns _setupOnly=true when creds absent but SETUP_ENABLED+SETUP_PUBLIC_URL set", async () => {
+      process.env = {
+        ...savedEnv,
+        APP_ID: undefined,
+        WEBHOOK_SECRET: undefined,
+        PRIVATE_KEY: undefined,
+        PRIVATE_KEY_PATH: undefined,
+        SETUP_ENABLED: "true",
+        SETUP_PUBLIC_URL: "https://example.test",
+        SETUP_OUTPUT_DIR: tmpDir,
+      };
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env._setupOnly).toBe(true);
+      expect(env.APP_ID).toBeUndefined();
+      expect(env.WEBHOOK_SECRET).toBeUndefined();
+      expect(env.PRIVATE_KEY).toBeUndefined();
+    });
+
+    it("loads credentials from SETUP_OUTPUT_DIR/credentials.env when env vars absent", async () => {
+      const credBody = [
+        `APP_ID=42`,
+        `WEBHOOK_SECRET=loaded-from-file-secret`,
+        `PRIVATE_KEY="${FAKE_PEM}"`,
+        "",
+      ].join("\n");
+      await writeFile(join(tmpDir, "credentials.env"), credBody, "utf8");
+
+      process.env = {
+        ...savedEnv,
+        APP_ID: undefined,
+        WEBHOOK_SECRET: undefined,
+        PRIVATE_KEY: undefined,
+        PRIVATE_KEY_PATH: undefined,
+        SETUP_ENABLED: "true",
+        SETUP_PUBLIC_URL: "https://example.test",
+        SETUP_OUTPUT_DIR: tmpDir,
+      };
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env._setupOnly).toBe(false);
+      expect(env.APP_ID).toBe(42);
+      expect(env.WEBHOOK_SECRET).toBe("loaded-from-file-secret");
+      expect(env.PRIVATE_KEY).toBe(FAKE_PEM);
+    });
+
+    it("process.env wins over credentials.env on overlapping keys", async () => {
+      const credBody = [
+        `APP_ID=42`,
+        `WEBHOOK_SECRET=from-file`,
+        `PRIVATE_KEY="${FAKE_PEM}"`,
+        "",
+      ].join("\n");
+      await writeFile(join(tmpDir, "credentials.env"), credBody, "utf8");
+
+      process.env = {
+        ...savedEnv,
+        APP_ID: "999",
+        WEBHOOK_SECRET: "from-env-sixteen",
+        PRIVATE_KEY: FAKE_PEM,
+        PRIVATE_KEY_PATH: undefined,
+        SETUP_OUTPUT_DIR: tmpDir,
+      };
+      const loadEnv = await importLoadEnv();
+      const env = loadEnv();
+      expect(env.APP_ID).toBe(999);
+      expect(env.WEBHOOK_SECRET).toBe("from-env-sixteen");
+    });
+
+    it("exits when no creds in env, no credentials.env file, no SETUP_ENABLED", async () => {
+      process.env = {
+        ...savedEnv,
+        APP_ID: undefined,
+        WEBHOOK_SECRET: undefined,
+        PRIVATE_KEY: undefined,
+        PRIVATE_KEY_PATH: undefined,
+        SETUP_ENABLED: undefined,
+        SETUP_OUTPUT_DIR: tmpDir,
+      };
+      const loadEnv = await importLoadEnv();
+      expect(() => loadEnv()).toThrow("process.exit called");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
 });

@@ -37,15 +37,40 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+          {{- if or .Values.existingSecretName .Values.extraEnvFrom }}
           envFrom:
+            {{- if .Values.existingSecretName }}
             - secretRef:
-                name: {{ required "existingSecretName must be set to the name of a k8s Secret containing APP_ID, WEBHOOK_SECRET, and PRIVATE_KEY" .Values.existingSecretName }}
+                name: {{ .Values.existingSecretName }}
+            {{- end }}
             {{- range .Values.extraEnvFrom }}
             - {{ toYaml . | nindent 14 | trim }}
             {{- end }}
-          {{- if .Values.extraEnv }}
+          {{- end }}
+          {{- if or .Values.extraEnv .Values.setup.enabled .Values.persistence.enabled }}
           env:
-            {{- toYaml .Values.extraEnv | nindent 12 }}
+            {{- if .Values.setup.enabled }}
+            - name: SETUP_ENABLED
+              value: "true"
+            {{- if .Values.setup.publicUrl }}
+            - name: SETUP_PUBLIC_URL
+              value: {{ .Values.setup.publicUrl | quote }}
+            {{- end }}
+            - name: SETUP_APP_NAME
+              value: {{ .Values.setup.appName | quote }}
+            {{- end }}
+            {{- if .Values.persistence.enabled }}
+            - name: SETUP_OUTPUT_DIR
+              value: {{ .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: setup-data
+              mountPath: {{ .Values.persistence.mountPath }}
           {{- end }}
           readinessProbe:
             httpGet:
@@ -61,3 +86,9 @@ spec:
             periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: setup-data
+          persistentVolumeClaim:
+            claimName: {{ include "auto-merge.fullname" . }}
+      {{- end }}

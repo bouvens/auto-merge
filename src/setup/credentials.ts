@@ -15,6 +15,32 @@ export interface CredentialsPayload {
 export const CREDENTIALS_FILENAME = "credentials.env";
 export const TTL_MS = 3_600_000;
 
+// Inverse of formatEnvFile — partial because consumers decide whether missing fields are fatal.
+export function parseEnvFile(body: string): Partial<CredentialsPayload> {
+  const idMatch = body.match(/^APP_ID=(\d+)/m);
+  const whMatch = body.match(/^WEBHOOK_SECRET=(.+)$/m);
+  const pemMatch = body.match(/^PRIVATE_KEY="([\s\S]+?)"/m);
+  const result: Partial<CredentialsPayload> = {};
+  // Capture group [1] is guaranteed by the regex shape; the .? guards strictNullChecks under noUncheckedIndexedAccess.
+  const idGroup = idMatch?.[1];
+  const whGroup = whMatch?.[1];
+  const pemGroup = pemMatch?.[1];
+  if (idGroup) result.id = Number(idGroup);
+  if (whGroup) result.webhook_secret = whGroup;
+  if (pemGroup) result.pem = pemGroup.replace(/\\"/g, '"');
+  return result;
+}
+
+export function readCredentialsFile(dir: string): Partial<CredentialsPayload> {
+  const file = join(dir, CREDENTIALS_FILENAME);
+  try {
+    return parseEnvFile(readFileSync(file, "utf8"));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw e;
+  }
+}
+
 export function formatEnvFile(payload: CredentialsPayload): string {
   if (payload.webhook_secret == null) {
     throw new Error(

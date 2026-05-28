@@ -1,27 +1,26 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { readCredentialsFile } from "./setup/credentials.js";
 
 const Base = z.object({
-  APP_ID: z.coerce.number().int().positive(),
-  WEBHOOK_SECRET: z.string().min(16, "WEBHOOK_SECRET must be at least 16 characters"),
+  APP_ID: z.coerce.number().int().positive().optional(),
+  WEBHOOK_SECRET: z.string().min(16, "WEBHOOK_SECRET must be at least 16 characters").optional(),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   WEBHOOK_QUEUE_MAX: z.coerce.number().int().positive().default(1000),
   SHUTDOWN_TIMEOUT: z.coerce.number().int().positive().default(30000),
   WEBHOOK_QUEUE_PER_KEY_MAX: z.coerce.number().int().positive().default(16),
-  // Empty string signals cron-disabled (D-06); syntax not validated here — croner throws at construction with a clearer error.
+  // Empty string disables cron; syntax is validated by croner at construction time.
   CRON_SCHEDULE: z.string().default("*/10 * * * *"),
   CRON_TZ: z.string().default("UTC"),
   SLACK_WEBHOOK_URL: z.url().optional(),
-  // D-02: min(40) catches truncated/empty tokens without locking to provider-specific regex.
+  // min(40) catches truncated/empty tokens without locking to provider-specific regex.
   TELEGRAM_BOT_TOKEN: z.string().min(40).optional(),
   TELEGRAM_DEFAULT_CHAT_ID: z.string().min(1).optional(),
-  // D-04: v1.1 env vars staged together so Phases 7-10 consume them as already-validated.
   NOTIFY_HEALTHCHECK_REQUIRED: z.coerce.boolean().default(false),
   NOTIFY_HEALTHCHECK_TTL_MS: z.coerce.number().int().positive().default(900_000),
   SETUP_ENABLED: z.coerce.boolean().default(false),
   SETUP_PUBLIC_URL: z.url().optional(),
-  // Staged regardless of SETUP_ENABLED so downstream stale-credentials check reads them unconditionally; max(34) mirrors GitHub App "name" length cap.
   SETUP_APP_NAME: z.string().min(1).max(34).default("auto-merge"),
   SETUP_OUTPUT_DIR: z.string().default("./data"),
   DEFAULT_CASCADE_CONFIG_FILE: z.string().optional(),
@@ -35,15 +34,14 @@ const Base = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
 });
 
-// z.xor with z.undefined() rejects absent process.env keys as nonoptional.
 const KeyFields = z.object({
   PRIVATE_KEY: z.string().min(1).optional(),
   PRIVATE_KEY_PATH: z.string().min(1).optional(),
 });
 
 const EnvSchema = Base.extend(KeyFields.shape)
-  .refine((e) => (e.PRIVATE_KEY ? 1 : 0) + (e.PRIVATE_KEY_PATH ? 1 : 0) === 1, {
-    message: "Exactly one of PRIVATE_KEY or PRIVATE_KEY_PATH must be set",
+  .refine((e) => !(e.PRIVATE_KEY && e.PRIVATE_KEY_PATH), {
+    message: "PRIVATE_KEY and PRIVATE_KEY_PATH are mutually exclusive",
     path: ["PRIVATE_KEY"],
   })
   .superRefine((e, ctx) => {
@@ -54,12 +52,40 @@ const EnvSchema = Base.extend(KeyFields.shape)
         message: "SETUP_PUBLIC_URL is required when SETUP_ENABLED=true",
       });
     }
+    const hasCreds =
+      e.APP_ID != null && e.WEBHOOK_SECRET != null && (e.PRIVATE_KEY || e.PRIVATE_KEY_PATH);
+    const setupReady = e.SETUP_ENABLED && e.SETUP_PUBLIC_URL;
+    if (!hasCreds && !setupReady) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["APP_ID"],
+        message:
+          "Provide APP_ID + WEBHOOK_SECRET + PRIVATE_KEY (or PRIVATE_KEY_PATH), OR enable SETUP_ENABLED=true with SETUP_PUBLIC_URL to self-bootstrap.",
+      });
+    }
   });
 
-// PRIVATE_KEY is always a resolved string after loadEnv, regardless of which source was used.
-export type Env = Omit<z.infer<typeof EnvSchema>, "PRIVATE_KEY" | "PRIVATE_KEY_PATH"> & {
+type BaseEnv = Omit<
+  z.infer<typeof EnvSchema>,
+  "PRIVATE_KEY" | "PRIVATE_KEY_PATH" | "APP_ID" | "WEBHOOK_SECRET"
+>;
+
+// _setupOnly narrows credential presence: full mode guarantees creds; setup-only mode has none yet.
+export type FullEnv = BaseEnv & {
+  _setupOnly: false;
+  APP_ID: number;
+  WEBHOOK_SECRET: string;
   PRIVATE_KEY: string;
 };
+
+export type SetupOnlyEnv = BaseEnv & {
+  _setupOnly: true;
+  APP_ID?: undefined;
+  WEBHOOK_SECRET?: undefined;
+  PRIVATE_KEY?: undefined;
+};
+
+export type Env = FullEnv | SetupOnlyEnv;
 
 // PaaS env vars and k8s Secrets without stringData deliver base64-encoded PEM.
 export function decodeMaybeBase64Pem(raw: string): string {
@@ -70,10 +96,20 @@ export function decodeMaybeBase64Pem(raw: string): string {
 }
 
 export function loadEnv(): Env {
-  const result = EnvSchema.safeParse(process.env);
+  // Layer order: process.env > credentials.env on disk. File survives pod restart after /setup/new completes.
+  const setupDir = process.env.SETUP_OUTPUT_DIR ?? "./data";
+  const fileCreds = readCredentialsFile(setupDir);
+
+  const merged: NodeJS.ProcessEnv = {
+    ...process.env,
+    APP_ID: process.env.APP_ID ?? fileCreds.id?.toString(),
+    WEBHOOK_SECRET: process.env.WEBHOOK_SECRET ?? fileCreds.webhook_secret,
+    PRIVATE_KEY: process.env.PRIVATE_KEY ?? fileCreds.pem,
+  };
+
+  const result = EnvSchema.safeParse(merged);
 
   if (!result.success) {
-    // console.error here because pino is not yet initialised at boot time.
     console.error(
       JSON.stringify({
         level: "fatal",
@@ -85,12 +121,16 @@ export function loadEnv(): Env {
   }
 
   const e = result.data;
+  const { PRIVATE_KEY: _inlineKey, PRIVATE_KEY_PATH: _path, APP_ID, WEBHOOK_SECRET, ...rest } = e;
 
-  // Synchronous file read is acceptable at boot-time before the event loop opens (D-23).
-  const keyPath = e.PRIVATE_KEY_PATH;
-  const rawKey = e.PRIVATE_KEY ?? (keyPath !== undefined ? readFileSync(keyPath, "utf8") : "");
-  const PRIVATE_KEY = decodeMaybeBase64Pem(rawKey);
+  if (APP_ID != null && WEBHOOK_SECRET != null && (e.PRIVATE_KEY || e.PRIVATE_KEY_PATH)) {
+    // Sync read acceptable at boot before event loop opens.
+    const rawKey =
+      e.PRIVATE_KEY ??
+      (e.PRIVATE_KEY_PATH !== undefined ? readFileSync(e.PRIVATE_KEY_PATH, "utf8") : "");
+    const PRIVATE_KEY = decodeMaybeBase64Pem(rawKey);
+    return { ...rest, _setupOnly: false, APP_ID, WEBHOOK_SECRET, PRIVATE_KEY };
+  }
 
-  const { PRIVATE_KEY: _inlineKey, PRIVATE_KEY_PATH: _path, ...rest } = e;
-  return { ...rest, PRIVATE_KEY };
+  return { ...rest, _setupOnly: true };
 }
