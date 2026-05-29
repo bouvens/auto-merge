@@ -107,13 +107,40 @@ async function resolveJobContext(
   }
   sourceShaDedup.mark(dedupKey);
 
+  // Placed after dedup so skipped ticks pay zero API cost for author resolution.
+  let headCommitAuthor: { username: string | null; email: string } = {
+    username: null,
+    email: "(unknown)",
+  };
+  try {
+    const commitResp = await octokit.request("GET /repos/{owner}/{repo}/commits/{ref}", {
+      owner,
+      repo,
+      ref: resolvedSha,
+    });
+    const data = (
+      commitResp as {
+        data: { author: { login?: string } | null; commit: { author: { email?: string } } };
+      }
+    ).data;
+    headCommitAuthor = {
+      username: data.author?.login ?? null,
+      email: data.commit.author.email ?? "(unknown)",
+    };
+  } catch (err) {
+    log.warn(
+      { ...baseLog, err, source_sha: resolvedSha, event: "cascade_failed_author_resolve" },
+      "cascade",
+    );
+  }
+
   const senderLogin = payload.source === "dispatch" ? (payload.sender?.login ?? null) : null;
 
   return {
     after: resolvedSha,
     config,
     branch: config.main_branch,
-    headCommitAuthor: { username: null, email: "(unknown)" },
+    headCommitAuthor,
     senderLogin,
   };
 }
