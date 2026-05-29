@@ -4,7 +4,7 @@ import type { Probot } from "probot";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createProbot } from "../../src/auth.js";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
 import { buildServer } from "../../src/server.js";
@@ -19,7 +19,8 @@ let probot: Probot;
 let app: FastifyInstance;
 let enqueuedJobs: string[];
 
-const fakeEnv: Env = {
+const fakeEnv: FullEnv = {
+  _setupOnly: false,
   APP_ID: 12345,
   WEBHOOK_SECRET,
   PORT: 3003,

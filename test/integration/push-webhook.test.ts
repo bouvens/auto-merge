@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createProbot, initBotIdentity } from "../../src/auth.js";
 import type { CascadeJob, PushJob } from "../../src/cascade/orchestrator.js";
 import { makeRunCascade } from "../../src/cascade/orchestrator.js";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import { log } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
 import { buildServer } from "../../src/server.js";
@@ -86,7 +86,8 @@ beforeAll(async () => {
   });
   privateKey = kp.privateKey;
 
-  const env: Env = {
+  const env: FullEnv = {
+    _setupOnly: false,
     APP_ID: 12345,
     WEBHOOK_SECRET,
     PORT: 3010,

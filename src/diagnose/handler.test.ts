@@ -300,7 +300,7 @@ describe("registerDiagnoseRoute — success path & content negotiation", () => {
 
   it("forwards REQUIRED_PERMISSIONS into runProbes call", async () => {
     const env = fakeEnv();
-    const runner = vi.fn(async () => fakeChecks());
+    const runner = vi.fn<NonNullable<DiagnoseDeps["runProbesFn"]>>(async () => fakeChecks());
     const app2 = await buildApp({ runProbesFn: runner });
     await app2.inject({
       method: "GET",

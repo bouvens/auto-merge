@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { parse as parseYaml } from "yaml";
 import { createProbot } from "../../src/auth.js";
 import type { CascadeJob } from "../../src/cascade/orchestrator.js";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { NoopChannel } from "../../src/notify/channel.js";
 import { createOnboardingHandlers } from "../../src/onboarding/handler.js";
@@ -165,7 +165,7 @@ const mswServer = setupServer(...handlers);
 
 let app: FastifyInstance;
 let probot: Probot;
-let env: Env;
+let env: FullEnv;
 let multiQueue: ReturnType<typeof createMultiQueue<CascadeJob>>;
 const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 
@@ -216,6 +216,7 @@ beforeAll(async () => {
   });
 
   env = {
+    _setupOnly: false,
     APP_ID: 12345,
     PRIVATE_KEY: privateKey,
     WEBHOOK_SECRET,
@@ -241,7 +242,7 @@ beforeAll(async () => {
     TELEGRAM_BOT_TOKEN: TELEGRAM_TOKEN,
     TELEGRAM_DEFAULT_CHAT_ID: "-1001",
     SETUP_PUBLIC_URL: "https://app.example.com",
-  } as Env;
+  } as FullEnv;
 
   probot = createProbot(env);
   await probot.ready();

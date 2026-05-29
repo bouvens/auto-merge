@@ -3,6 +3,7 @@ import { http } from "msw";
 import { setupServer } from "msw/node";
 import type { Probot } from "probot";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { FullEnv } from "../../src/env.js";
 
 // onUnhandledRequest:'error' proves readyzCheck makes zero network calls.
 const server = setupServer();
@@ -26,8 +27,9 @@ beforeAll(() => {
   validPem = privateKey;
 });
 
-function makeEnv(overrides: Partial<{ PRIVATE_KEY: string }> = {}) {
+function makeEnv(overrides: Partial<{ PRIVATE_KEY: string }> = {}): FullEnv {
   return {
+    _setupOnly: false,
     APP_ID: 12345,
     PRIVATE_KEY: validPem,
     WEBHOOK_SECRET: "test-webhook-secret-32-chars-long",

@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import pino from "pino";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import type { NotifyHealthChecker } from "../../src/notify/healthCheck.js";
 import { buildServer } from "../../src/server.js";
 
@@ -24,8 +24,9 @@ const REPO = "testrepo";
 
 const noopLog = pino({ level: "silent" });
 
-function makeEnv(overrides: Partial<Env>): Env {
+function makeEnv(overrides: Partial<FullEnv>): FullEnv {
   return {
+    _setupOnly: false,
     APP_ID: 1,
     PRIVATE_KEY: "dummy",
     WEBHOOK_SECRET: "test-secret-1234567890abc",
@@ -122,7 +123,7 @@ afterEach(() => mswServer.resetHandlers(...buildHappyMsw()));
 afterAll(() => mswServer.close());
 
 interface BootOpts {
-  envOverrides?: Partial<Env>;
+  envOverrides?: Partial<FullEnv>;
 }
 
 async function boot(opts: BootOpts = {}): Promise<FastifyInstance> {
