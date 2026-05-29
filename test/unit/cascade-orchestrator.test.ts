@@ -7,6 +7,7 @@ vi.mock("../../src/cascade/conflict.js", () => ({ createConflictPR: vi.fn() }));
 vi.mock("../../src/cascade/checkRun.js", () => ({
   completeFailure: vi.fn(),
   createInProgress: vi.fn(),
+  findPriorFailureCheckRun: vi.fn(),
 }));
 vi.mock("../../src/auth.js", () => ({
   getInstallationOctokit: vi.fn(async () => ({ request: vi.fn() })),
@@ -15,7 +16,11 @@ vi.mock("../../src/auth.js", () => ({
 vi.mock("../../src/config/loader.js", () => ({ loadConfig: vi.fn() }));
 
 import { getBotIdentity, getInstallationOctokit } from "../../src/auth.js";
-import { completeFailure, createInProgress } from "../../src/cascade/checkRun.js";
+import {
+  completeFailure,
+  createInProgress,
+  findPriorFailureCheckRun,
+} from "../../src/cascade/checkRun.js";
 import { createConflictPR } from "../../src/cascade/conflict.js";
 import { mergeStep } from "../../src/cascade/merge.js";
 import { type CascadeJob, makeRunCascade, type PushJob } from "../../src/cascade/orchestrator.js";
@@ -28,6 +33,7 @@ const mergeStepMock = vi.mocked(mergeStep);
 const buildCascadePlanMock = vi.mocked(buildCascadePlan);
 const createConflictPRMock = vi.mocked(createConflictPR);
 const completeFailureMock = vi.mocked(completeFailure);
+const findPriorFailureCheckRunMock = vi.mocked(findPriorFailureCheckRun);
 const getInstallationOctokitMock = vi.mocked(getInstallationOctokit);
 const loadConfigMock = vi.mocked(loadConfig);
 
@@ -89,6 +95,8 @@ beforeEach(() => {
   notifyEvents.length = 0;
   getInstallationOctokitMock.mockResolvedValue({ request: vi.fn() } as never);
   vi.mocked(getBotIdentity).mockReturnValue({ login: "my-app[bot]", email: "bot@noreply" });
+  // Default: no prior failure run, so dedup does not suppress.
+  findPriorFailureCheckRunMock.mockResolvedValue(false);
   infoSpy = vi.spyOn(log, "info").mockImplementation(() => undefined);
   errorSpy = vi.spyOn(log, "error").mockImplementation(() => undefined);
   warnSpy = vi.spyOn(log, "warn").mockImplementation(() => undefined);
@@ -564,6 +572,199 @@ describe("runCascade (via makeRunCascade)", () => {
         (c: unknown[]) => (c[0] as string) === "GET /repos/{owner}/{repo}/commits/{ref}",
       );
       expect(commitApiCalls).toHaveLength(0);
+    });
+  });
+
+  describe("conflict_pr: false gate", () => {
+    it("conflict + conflict_pr:false + no prior failure → no createConflictPR, completeFailure called, notify with pr_url:''", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      findPriorFailureCheckRunMock.mockResolvedValue(false);
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: false,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).not.toHaveBeenCalled();
+      expect(completeFailureMock).toHaveBeenCalledTimes(1);
+      expect(completeFailureMock.mock.calls[0]![1].kind).toBe("real_conflict");
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev).toBeDefined();
+      expect(ev?.kind === "cascade_conflict" && ev.pr_url).toBe("");
+    });
+
+    it("conflict + conflict_pr:false + prior failure run → notify suppressed, suppression log emitted", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      findPriorFailureCheckRunMock.mockResolvedValue(true);
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: false,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).not.toHaveBeenCalled();
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(0);
+      const suppressedLog = infoSpy.mock.calls.find(
+        (c: unknown[]) =>
+          (c[0] as { event?: string })?.event === "cascade_conflict_notification_suppressed",
+      );
+      expect(suppressedLog).toBeDefined();
+      expect((suppressedLog![0] as { reason?: string }).reason).toBe("prior_check_run");
+    });
+
+    it("conflict + conflict_pr:true → existing path (createConflictPR called, kkm reused gate intact)", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/5",
+        pr_number: 5,
+        reused: false,
+      });
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: true,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).toHaveBeenCalledTimes(1);
+      expect(findPriorFailureCheckRunMock).not.toHaveBeenCalled();
+    });
+
+    it("protection_blocked + conflict_pr:false + no prior failure → no createConflictPR, completeFailure called, notify with pr_url:''", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "protection_blocked",
+        rule: "required_pull_request_reviews",
+        source_sha: "src1234",
+        check_run_id: null,
+        check_run_html_url: null,
+      });
+      vi.mocked(createInProgress).mockResolvedValue({
+        check_run_id: 88,
+        html_url: "https://gh/cr/88",
+      });
+      findPriorFailureCheckRunMock.mockResolvedValue(false);
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: false,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).not.toHaveBeenCalled();
+      expect(completeFailureMock).toHaveBeenCalledTimes(1);
+      expect(completeFailureMock.mock.calls[0]![1].kind).toBe("protection_blocked");
+      const ev = notifyEvents.find((e) => e.kind === "protection_blocked");
+      expect(ev).toBeDefined();
+      expect(ev?.kind === "protection_blocked" && ev.pr_url).toBe("");
+    });
+
+    it("protection_blocked + conflict_pr:false + prior failure run → notify suppressed", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "protection_blocked",
+        rule: "required_pull_request_reviews",
+        source_sha: "src1234",
+        check_run_id: 12,
+        check_run_html_url: "https://gh/cr/12",
+      });
+      findPriorFailureCheckRunMock.mockResolvedValue(true);
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: false,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).not.toHaveBeenCalled();
+      expect(notifyEvents.filter((e) => e.kind === "protection_blocked")).toHaveLength(0);
+      const suppressedLog = infoSpy.mock.calls.find(
+        (c: unknown[]) =>
+          (c[0] as { event?: string })?.event === "cascade_conflict_notification_suppressed",
+      );
+      expect(suppressedLog).toBeDefined();
+      expect((suppressedLog![0] as { reason?: string }).reason).toBe("prior_check_run");
+    });
+
+    it("protection_blocked + conflict_pr:true → existing path (createConflictPR called)", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "protection_blocked",
+        rule: "required_pull_request_reviews",
+        source_sha: "src1234",
+        check_run_id: null,
+        check_run_html_url: null,
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/6",
+        pr_number: 6,
+        reused: false,
+      });
+      vi.mocked(createInProgress).mockResolvedValue({
+        check_run_id: 99,
+        html_url: "https://gh/cr/99",
+      });
+
+      await makeRunCascadeWithNoop()(
+        job({
+          config: {
+            main_branch: "main",
+            release_branch: "release",
+            dev_branch: "dev",
+            conflict_pr: true,
+          },
+        }),
+      );
+
+      expect(createConflictPRMock).toHaveBeenCalledTimes(1);
+      expect(findPriorFailureCheckRunMock).not.toHaveBeenCalled();
     });
   });
 });

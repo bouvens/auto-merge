@@ -5,7 +5,7 @@ import type { Config } from "../config/schema.js";
 import { log } from "../log.js";
 import type { NotificationChannel } from "../notify/channel.js";
 import type { Handler, Job } from "../webhook/queue.js";
-import { completeFailure, createInProgress } from "./checkRun.js";
+import { completeFailure, createInProgress, findPriorFailureCheckRun } from "./checkRun.js";
 import { createConflictPR } from "./conflict.js";
 import { type MergeOutcome, mergeStep } from "./merge.js";
 import { buildCascadePlan } from "./plan.js";
@@ -203,124 +203,235 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
         }
 
         if (result.outcome === "conflict") {
-          const prResult = await createConflictPR(
-            { octokit, owner, repo },
-            {
-              src,
-              tgt,
-              source_sha: after,
-              runId,
-              checkRunHtmlUrl: result.check_run_html_url,
-              headCommitAuthor,
-            },
-          );
-          const detail = prResult.ok ? prResult.pr_url : `conflict PR failed: ${prResult.error}`;
-          if (result.check_run_id !== null) {
-            await completeFailure(
+          if (config.conflict_pr === false) {
+            const checkRunName = `auto-merge: ${src} → ${tgt}`;
+            // Query prior failure BEFORE completing our run; completing it would cause self-count.
+            const hasPriorFailure = await findPriorFailureCheckRun(
               { octokit, owner, repo },
-              {
-                check_run_id: result.check_run_id,
+              { head_sha: after, name: checkRunName },
+            );
+            const detail = "conflict (PR creation disabled by config)";
+            if (result.check_run_id !== null) {
+              await completeFailure(
+                { octokit, owner, repo },
+                {
+                  check_run_id: result.check_run_id,
+                  src,
+                  tgt,
+                  runId,
+                  kind: "real_conflict",
+                  detail,
+                },
+              );
+            }
+            log.info(
+              { ...baseLog, src, tgt, pr_url: null, event: "cascade_step_conflict" },
+              "cascade",
+            );
+            if (hasPriorFailure) {
+              log.info(
+                {
+                  ...baseLog,
+                  src,
+                  tgt,
+                  reason: "prior_check_run",
+                  event: "cascade_conflict_notification_suppressed",
+                },
+                "cascade",
+              );
+            } else {
+              await notify.notify({
+                kind: "cascade_conflict",
+                installation_id,
+                run_id: runId,
+                repo: `${owner}/${repo}`,
                 src,
                 tgt,
+                pr_url: "",
+                ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+                ...(result.check_run_html_url
+                  ? { check_run_html_url: result.check_run_html_url }
+                  : {}),
+              });
+            }
+          } else {
+            const prResult = await createConflictPR(
+              { octokit, owner, repo },
+              {
+                src,
+                tgt,
+                source_sha: after,
                 runId,
-                kind: "real_conflict",
-                detail,
+                checkRunHtmlUrl: result.check_run_html_url,
+                headCommitAuthor,
               },
             );
-          }
-          log.info(
-            {
-              ...baseLog,
-              src,
-              tgt,
-              pr_url: prResult.ok ? prResult.pr_url : null,
-              event: "cascade_step_conflict",
-            },
-            "cascade",
-          );
-          // Same-SHA conflict PR already cc'd the author on first creation; re-firing adds no signal.
-          if (prResult.ok && prResult.reused) {
+            const detail = prResult.ok ? prResult.pr_url : `conflict PR failed: ${prResult.error}`;
+            if (result.check_run_id !== null) {
+              await completeFailure(
+                { octokit, owner, repo },
+                {
+                  check_run_id: result.check_run_id,
+                  src,
+                  tgt,
+                  runId,
+                  kind: "real_conflict",
+                  detail,
+                },
+              );
+            }
             log.info(
               {
                 ...baseLog,
                 src,
                 tgt,
-                pr_url: prResult.pr_url,
-                reason: "pr_reused",
-                event: "cascade_conflict_notification_suppressed",
+                pr_url: prResult.ok ? prResult.pr_url : null,
+                event: "cascade_step_conflict",
               },
               "cascade",
             );
-          } else {
-            await notify.notify({
-              kind: "cascade_conflict",
-              installation_id,
-              run_id: runId,
-              repo: `${owner}/${repo}`,
-              src,
-              tgt,
-              pr_url: prResult.ok ? prResult.pr_url : "",
-              ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
-              ...(result.check_run_html_url
-                ? { check_run_html_url: result.check_run_html_url }
-                : {}),
-            });
+            // Same-SHA conflict PR already cc'd the author on first creation; re-firing adds no signal.
+            if (prResult.ok && prResult.reused) {
+              log.info(
+                {
+                  ...baseLog,
+                  src,
+                  tgt,
+                  pr_url: prResult.pr_url,
+                  reason: "pr_reused",
+                  event: "cascade_conflict_notification_suppressed",
+                },
+                "cascade",
+              );
+            } else {
+              await notify.notify({
+                kind: "cascade_conflict",
+                installation_id,
+                run_id: runId,
+                repo: `${owner}/${repo}`,
+                src,
+                tgt,
+                pr_url: prResult.ok ? prResult.pr_url : "",
+                ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+                ...(result.check_run_html_url
+                  ? { check_run_html_url: result.check_run_html_url }
+                  : {}),
+              });
+            }
           }
           break;
         }
 
         if (result.outcome === "protection_blocked") {
           const summaryPrefix = `Blocked by branch protection: ${result.rule}`;
-          const prResult = await createConflictPR(
-            { octokit, owner, repo },
-            {
-              src,
-              tgt,
-              source_sha: after,
-              runId,
-              checkRunHtmlUrl: null,
-              headCommitAuthor,
-              summaryPrefix,
-            },
-          );
-          const pr_url = prResult.ok ? prResult.pr_url : "";
 
-          // When mergeStep skipped the in_progress Check Run (protection blocked before it was created), create one now for the failure record.
-          let checkRunId = result.check_run_id;
-          let checkRunHtmlUrl = result.check_run_html_url;
-          if (checkRunId === null) {
-            const cr = await createInProgress(
+          if (config.conflict_pr === false) {
+            const checkRunName = `auto-merge: ${src} → ${tgt}`;
+            // Query prior failure before completing our run to avoid self-counting an in_progress run.
+            const hasPriorFailure = await findPriorFailureCheckRun(
               { octokit, owner, repo },
-              { source_sha: after, src, tgt, runId },
+              { head_sha: after, name: checkRunName },
             );
-            checkRunId = cr?.check_run_id ?? null;
-            checkRunHtmlUrl = cr?.html_url ?? null;
-          }
-          if (checkRunId !== null) {
-            await completeFailure(
-              { octokit, owner, repo },
-              {
-                check_run_id: checkRunId,
+            let checkRunId = result.check_run_id;
+            let checkRunHtmlUrl = result.check_run_html_url;
+            if (checkRunId === null) {
+              const cr = await createInProgress(
+                { octokit, owner, repo },
+                { source_sha: after, src, tgt, runId },
+              );
+              checkRunId = cr?.check_run_id ?? null;
+              checkRunHtmlUrl = cr?.html_url ?? null;
+            }
+            if (checkRunId !== null) {
+              await completeFailure(
+                { octokit, owner, repo },
+                {
+                  check_run_id: checkRunId,
+                  src,
+                  tgt,
+                  runId,
+                  kind: "protection_blocked",
+                  detail: summaryPrefix,
+                },
+              );
+            }
+            if (hasPriorFailure) {
+              log.info(
+                {
+                  ...baseLog,
+                  src,
+                  tgt,
+                  reason: "prior_check_run",
+                  event: "cascade_conflict_notification_suppressed",
+                },
+                "cascade",
+              );
+            } else {
+              await notify.notify({
+                kind: "protection_blocked",
+                installation_id,
+                run_id: runId,
+                repo: `${owner}/${repo}`,
                 src,
                 tgt,
+                pr_url: "",
+                rule: result.rule,
+                ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+                ...(checkRunHtmlUrl ? { check_run_html_url: checkRunHtmlUrl } : {}),
+              });
+            }
+          } else {
+            const prResult = await createConflictPR(
+              { octokit, owner, repo },
+              {
+                src,
+                tgt,
+                source_sha: after,
                 runId,
-                kind: "protection_blocked",
-                detail: prResult.ok ? prResult.pr_url : summaryPrefix,
+                checkRunHtmlUrl: null,
+                headCommitAuthor,
+                summaryPrefix,
               },
             );
+            const pr_url = prResult.ok ? prResult.pr_url : "";
+
+            // When protection blocks before the Check Run was created, create one now for the failure record.
+            let checkRunId = result.check_run_id;
+            let checkRunHtmlUrl = result.check_run_html_url;
+            if (checkRunId === null) {
+              const cr = await createInProgress(
+                { octokit, owner, repo },
+                { source_sha: after, src, tgt, runId },
+              );
+              checkRunId = cr?.check_run_id ?? null;
+              checkRunHtmlUrl = cr?.html_url ?? null;
+            }
+            if (checkRunId !== null) {
+              await completeFailure(
+                { octokit, owner, repo },
+                {
+                  check_run_id: checkRunId,
+                  src,
+                  tgt,
+                  runId,
+                  kind: "protection_blocked",
+                  detail: prResult.ok ? prResult.pr_url : summaryPrefix,
+                },
+              );
+            }
+            await notify.notify({
+              kind: "protection_blocked",
+              installation_id,
+              run_id: runId,
+              repo: `${owner}/${repo}`,
+              src,
+              tgt,
+              pr_url,
+              rule: result.rule,
+              ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+              ...(checkRunHtmlUrl ? { check_run_html_url: checkRunHtmlUrl } : {}),
+            });
           }
-          await notify.notify({
-            kind: "protection_blocked",
-            installation_id,
-            run_id: runId,
-            repo: `${owner}/${repo}`,
-            src,
-            tgt,
-            pr_url,
-            rule: result.rule,
-            ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
-            ...(checkRunHtmlUrl ? { check_run_html_url: checkRunHtmlUrl } : {}),
-          });
           break;
         }
 
