@@ -25,6 +25,7 @@ const VALID_CONFIG = {
   main_branch: "main",
   release_branch: "release",
   dev_branch: "dev",
+  conflict_pr: true,
 };
 
 const silentLog = pino({ level: process.env.DEBUG_PROBES ? "debug" : "silent" });

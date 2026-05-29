@@ -5,7 +5,7 @@ describe("parseConfig — no I/O", () => {
   it("returns config for valid YAML", () => {
     const result = parseConfig("main_branch: main\ndev_branch: dev\n");
     expect(result.errors).toHaveLength(0);
-    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev", conflict_pr: true });
   });
 
   it("returns error for YAML syntax error with line/col defined", () => {

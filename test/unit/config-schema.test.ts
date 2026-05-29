@@ -85,4 +85,46 @@ describe("ConfigSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("omitted conflict_pr defaults to true", () => {
+    const result = ConfigSchema.safeParse({ main_branch: "main", dev_branch: "dev" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.conflict_pr).toBe(true);
+    }
+  });
+
+  it("conflict_pr: false parses successfully", () => {
+    const result = ConfigSchema.safeParse({
+      main_branch: "main",
+      dev_branch: "dev",
+      conflict_pr: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.conflict_pr).toBe(false);
+    }
+  });
+
+  it("conflict_pr: 'yes' (non-boolean) fails validation", () => {
+    const result = ConfigSchema.safeParse({
+      main_branch: "main",
+      dev_branch: "dev",
+      conflict_pr: "yes",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("existing minimal config regression — conflict_pr absent still parses (default true)", () => {
+    const result = ConfigSchema.safeParse({
+      main_branch: "main",
+      release_branch: "release",
+      dev_branch: "dev",
+      notifications: { slack: { channel: "#ops" } },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.conflict_pr).toBe(true);
+    }
+  });
 });

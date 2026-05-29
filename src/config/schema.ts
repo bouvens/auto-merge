@@ -22,6 +22,8 @@ export const ConfigSchema = z
     main_branch: z.string().min(1),
     release_branch: z.string().min(1).optional(),
     dev_branch: z.string().min(1),
+    // Gates auto-creation of conflict/protection PRs; default true preserves existing behaviour.
+    conflict_pr: z.boolean().default(true),
     notifications: NotificationsSchema,
   })
   .strict();

@@ -62,6 +62,7 @@ const job = (overrides: Partial<PushJob> = {}) => ({
       main_branch: "main",
       release_branch: "release",
       dev_branch: "dev",
+      conflict_pr: true,
     },
     ...overrides,
   } as PushJob,
@@ -376,7 +377,12 @@ describe("runCascade (via makeRunCascade)", () => {
     };
     getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
     loadConfigMock.mockResolvedValue({
-      config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+      config: {
+        main_branch: "main",
+        release_branch: "release",
+        dev_branch: "dev",
+        conflict_pr: true,
+      },
       errors: [],
     });
     buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
@@ -404,7 +410,12 @@ describe("runCascade (via makeRunCascade)", () => {
     };
     getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
     loadConfigMock.mockResolvedValue({
-      config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+      config: {
+        main_branch: "main",
+        release_branch: "release",
+        dev_branch: "dev",
+        conflict_pr: true,
+      },
       errors: [],
     });
     buildCascadePlanMock.mockResolvedValue([]);
@@ -452,7 +463,12 @@ describe("runCascade (via makeRunCascade)", () => {
       });
       getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
       loadConfigMock.mockResolvedValue({
-        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        config: {
+          main_branch: "main",
+          release_branch: "release",
+          dev_branch: "dev",
+          conflict_pr: true,
+        },
         errors: [],
       });
       buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
@@ -482,7 +498,12 @@ describe("runCascade (via makeRunCascade)", () => {
       });
       getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
       loadConfigMock.mockResolvedValue({
-        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        config: {
+          main_branch: "main",
+          release_branch: "release",
+          dev_branch: "dev",
+          conflict_pr: true,
+        },
         errors: [],
       });
       buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
@@ -512,7 +533,12 @@ describe("runCascade (via makeRunCascade)", () => {
       const fakeOctokit = makeCronOctokit("cron-author-sha-3", null, true);
       getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
       loadConfigMock.mockResolvedValue({
-        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        config: {
+          main_branch: "main",
+          release_branch: "release",
+          dev_branch: "dev",
+          conflict_pr: true,
+        },
         errors: [],
       });
       buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);

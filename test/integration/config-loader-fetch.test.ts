@@ -47,7 +47,7 @@ describe("loadConfig — GitHub Contents API fetch", () => {
       installation_id: 0,
     });
     expect(result.errors).toHaveLength(0);
-    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev", conflict_pr: true });
     expect(result.source).toBe("repo");
     expect(getRepoConfigSource("o", "r")).toBe("repo");
     expect(callCounts["sha-fetch-01"]).toBe(1);
