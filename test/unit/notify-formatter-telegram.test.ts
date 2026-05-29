@@ -136,6 +136,58 @@ describe("formatTelegram — config_invalid", () => {
   });
 });
 
+describe("formatTelegram — empty pr_url omits View PR line", () => {
+  it("cascade_conflict + empty pr_url → no View PR link in output", () => {
+    const out = formatTelegram({
+      kind: "cascade_conflict",
+      run_id: "run1",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "release",
+      pr_url: "",
+    });
+    expect(out).not.toContain("View PR");
+  });
+
+  it("cascade_conflict + non-empty pr_url → View PR link present", () => {
+    const out = formatTelegram({
+      kind: "cascade_conflict",
+      run_id: "run1",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "release",
+      pr_url: "https://github.com/owner/repo/pull/5",
+    });
+    expect(out).toContain('<a href="https://github.com/owner/repo/pull/5">View PR</a>');
+  });
+
+  it("protection_blocked + empty pr_url → no View PR link in output", () => {
+    const out = formatTelegram({
+      kind: "protection_blocked",
+      run_id: "run2",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "dev",
+      pr_url: "",
+      rule: "required_status_checks",
+    });
+    expect(out).not.toContain("View PR");
+  });
+
+  it("protection_blocked + non-empty pr_url → View PR link present", () => {
+    const out = formatTelegram({
+      kind: "protection_blocked",
+      run_id: "run2",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "dev",
+      pr_url: "https://github.com/owner/repo/pull/6",
+      rule: "required_status_checks",
+    });
+    expect(out).toContain('<a href="https://github.com/owner/repo/pull/6">View PR</a>');
+  });
+});
+
 describe("formatTelegram — truncate behavior", () => {
   it("truncates output exceeding 4000 chars and appends suffix", () => {
     // Use a massive zod_error to exceed 4000 chars

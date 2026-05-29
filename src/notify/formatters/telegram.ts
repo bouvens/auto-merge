@@ -13,8 +13,8 @@ const formatters: { [K in NotifyEvent["kind"]]: (e: Extract<NotifyEvent, { kind:
       `<b>Cascade conflict</b>\n` +
       `Repo: <code>${escapeHtml(e.repo)}</code>\n` +
       `<code>${escapeHtml(e.src)}</code> → <code>${escapeHtml(e.tgt)}</code>\n` +
-      `Author: ${escapeHtml(e.author_login ?? "unknown")}\n` +
-      `<a href="${e.pr_url}">View PR</a>` +
+      `Author: ${escapeHtml(e.author_login ?? "unknown")}` +
+      (e.pr_url ? `\n<a href="${e.pr_url}">View PR</a>` : "") +
       (e.check_run_html_url ? `\n<a href="${e.check_run_html_url}">View Check Run</a>` : ""),
 
     protection_blocked: (e) =>
@@ -22,8 +22,8 @@ const formatters: { [K in NotifyEvent["kind"]]: (e: Extract<NotifyEvent, { kind:
       `Repo: <code>${escapeHtml(e.repo)}</code>\n` +
       `<code>${escapeHtml(e.src)}</code> → <code>${escapeHtml(e.tgt)}</code>\n` +
       `Rule: <code>${escapeHtml(e.rule)}</code>\n` +
-      `Author: ${escapeHtml(e.author_login ?? "unknown")}\n` +
-      `<a href="${e.pr_url}">View PR</a>` +
+      `Author: ${escapeHtml(e.author_login ?? "unknown")}` +
+      (e.pr_url ? `\n<a href="${e.pr_url}">View PR</a>` : "") +
       (e.check_run_html_url ? `\n<a href="${e.check_run_html_url}">View Check Run</a>` : ""),
 
     permission_error: (e) =>
