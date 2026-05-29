@@ -193,6 +193,7 @@ describe("findPriorFailureCheckRun", () => {
     expect(route).toBe("GET /repos/{owner}/{repo}/commits/{ref}/check-runs");
     expect((params as { ref: string }).ref).toBe("deadbeef");
     expect((params as { check_name: string }).check_name).toBe("auto-merge: main → release");
+    expect((params as { filter: string }).filter).toBe("all");
   });
 
   it("returns false when only an in_progress run exists (our own run must not self-count)", async () => {

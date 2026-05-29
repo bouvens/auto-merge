@@ -636,7 +636,7 @@ describe("runCascade (via makeRunCascade)", () => {
       expect((suppressedLog![0] as { reason?: string }).reason).toBe("prior_check_run");
     });
 
-    it("conflict + conflict_pr:true → existing path (createConflictPR called, kkm reused gate intact)", async () => {
+    it("conflict + conflict_pr:true → existing path (createConflictPR called, reused gate intact)", async () => {
       buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
       mergeStepMock.mockResolvedValueOnce({
         outcome: "conflict",

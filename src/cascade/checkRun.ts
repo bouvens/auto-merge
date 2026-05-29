@@ -147,6 +147,8 @@ export async function findPriorFailureCheckRun(
       repo: deps.repo,
       ref: opts.head_sha,
       check_name: opts.name,
+      // Default "latest" hides a prior completed failure once a fresh in_progress run exists for the same name.
+      filter: "all",
     });
     const checkRuns = (
       resp.data as { check_runs: Array<{ status: string; conclusion: string | null }> }
