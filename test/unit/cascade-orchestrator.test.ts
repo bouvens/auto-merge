@@ -268,6 +268,73 @@ describe("runCascade (via makeRunCascade)", () => {
     }
   });
 
+  describe("conflict notify gate (reused PR)", () => {
+    it("new PR (reused:false) → cascade_conflict notify fires once", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/9",
+        pr_number: 9,
+        reused: false,
+      });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(1);
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev?.kind === "cascade_conflict" && ev.pr_url).toBe("https://gh/pr/9");
+    });
+
+    it("reused PR (reused:true) → cascade_conflict notify suppressed, completeFailure still called", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/9",
+        pr_number: 9,
+        reused: true,
+      });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(0);
+      expect(completeFailureMock).toHaveBeenCalledTimes(1);
+      const suppressedLog = infoSpy.mock.calls.find(
+        (c: unknown[]) =>
+          (c[0] as { event?: string })?.event === "cascade_conflict_notification_suppressed",
+      );
+      expect(suppressedLog).toBeDefined();
+    });
+
+    it("PR creation failed (ok:false) → cascade_conflict notify still fires with pr_url=''", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: null,
+      });
+      createConflictPRMock.mockResolvedValue({ ok: false, error: "boom" });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(1);
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev?.kind === "cascade_conflict" && ev.pr_url).toBe("");
+    });
+  });
+
   it("permission_error → NO createConflictPR, completeFailure called, notify called, break", async () => {
     buildCascadePlanMock.mockResolvedValue([
       { src: "main", tgt: "release" },

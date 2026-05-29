@@ -211,17 +211,34 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
             },
             "cascade",
           );
-          await notify.notify({
-            kind: "cascade_conflict",
-            installation_id,
-            run_id: runId,
-            repo: `${owner}/${repo}`,
-            src,
-            tgt,
-            pr_url: prResult.ok ? prResult.pr_url : "",
-            ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
-            ...(result.check_run_html_url ? { check_run_html_url: result.check_run_html_url } : {}),
-          });
+          // Same-SHA conflict PR already cc'd the author on first creation; re-firing adds no signal.
+          if (prResult.ok && prResult.reused) {
+            log.info(
+              {
+                ...baseLog,
+                src,
+                tgt,
+                pr_url: prResult.pr_url,
+                reason: "pr_reused",
+                event: "cascade_conflict_notification_suppressed",
+              },
+              "cascade",
+            );
+          } else {
+            await notify.notify({
+              kind: "cascade_conflict",
+              installation_id,
+              run_id: runId,
+              repo: `${owner}/${repo}`,
+              src,
+              tgt,
+              pr_url: prResult.ok ? prResult.pr_url : "",
+              ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+              ...(result.check_run_html_url
+                ? { check_run_html_url: result.check_run_html_url }
+                : {}),
+            });
+          }
           break;
         }
 
