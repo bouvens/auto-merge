@@ -81,6 +81,7 @@ const cronJob = (overrides: Partial<Extract<CascadeJob, { source: "cron" }>> = {
 
 let infoSpy: ReturnType<typeof vi.spyOn>;
 let errorSpy: ReturnType<typeof vi.spyOn>;
+let warnSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -89,6 +90,7 @@ beforeEach(() => {
   vi.mocked(getBotIdentity).mockReturnValue({ login: "my-app[bot]", email: "bot@noreply" });
   infoSpy = vi.spyOn(log, "info").mockImplementation(() => undefined);
   errorSpy = vi.spyOn(log, "error").mockImplementation(() => undefined);
+  warnSpy = vi.spyOn(log, "warn").mockImplementation(() => undefined);
 });
 
 describe("runCascade (via makeRunCascade)", () => {
@@ -268,6 +270,73 @@ describe("runCascade (via makeRunCascade)", () => {
     }
   });
 
+  describe("conflict notify gate (reused PR)", () => {
+    it("new PR (reused:false) → cascade_conflict notify fires once", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/9",
+        pr_number: 9,
+        reused: false,
+      });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(1);
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev?.kind === "cascade_conflict" && ev.pr_url).toBe("https://gh/pr/9");
+    });
+
+    it("reused PR (reused:true) → cascade_conflict notify suppressed, completeFailure still called", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: "https://gh/cr/7",
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/9",
+        pr_number: 9,
+        reused: true,
+      });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(0);
+      expect(completeFailureMock).toHaveBeenCalledTimes(1);
+      const suppressedLog = infoSpy.mock.calls.find(
+        (c: unknown[]) =>
+          (c[0] as { event?: string })?.event === "cascade_conflict_notification_suppressed",
+      );
+      expect(suppressedLog).toBeDefined();
+    });
+
+    it("PR creation failed (ok:false) → cascade_conflict notify still fires with pr_url=''", async () => {
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "src1234",
+        check_run_id: 7,
+        check_run_html_url: null,
+      });
+      createConflictPRMock.mockResolvedValue({ ok: false, error: "boom" });
+
+      await makeRunCascadeWithNoop()(job());
+
+      expect(notifyEvents.filter((e) => e.kind === "cascade_conflict")).toHaveLength(1);
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev?.kind === "cascade_conflict" && ev.pr_url).toBe("");
+    });
+  });
+
   it("permission_error → NO createConflictPR, completeFailure called, notify called, break", async () => {
     buildCascadePlanMock.mockResolvedValue([
       { src: "main", tgt: "release" },
@@ -359,5 +428,116 @@ describe("runCascade (via makeRunCascade)", () => {
     );
     expect(started).toBeDefined();
     expect((started![0] as { sender_login?: string }).sender_login).toBe("deploy-bot");
+  });
+
+  describe("cron/dispatch HEAD commit author resolution", () => {
+    function makeCronOctokit(sha: string, commitResponse: unknown, throwOnCommit = false) {
+      return {
+        request: vi.fn(async (route: string) => {
+          if (route === "GET /repos/{owner}/{repo}/branches/{branch}") {
+            return { data: { commit: { sha } } };
+          }
+          if (route === "GET /repos/{owner}/{repo}/commits/{ref}") {
+            if (throwOnCommit) throw new Error("API timeout");
+            return commitResponse;
+          }
+          throw new Error(`unexpected route: ${route}`);
+        }),
+      };
+    }
+
+    it("cron path resolves author login from commit API, flows into notify payload", async () => {
+      const fakeOctokit = makeCronOctokit("cron-author-sha-1", {
+        data: { author: { login: "alice" }, commit: { author: { email: "alice@example.com" } } },
+      });
+      getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+      loadConfigMock.mockResolvedValue({
+        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        errors: [],
+      });
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "cron-author-sha-1",
+        check_run_id: null,
+        check_run_html_url: null,
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/20",
+        pr_number: 20,
+        reused: false,
+      });
+
+      await makeRunCascadeWithNoop()(cronJob());
+
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev).toBeDefined();
+      expect(ev?.kind === "cascade_conflict" && ev.author_login).toBe("alice");
+    });
+
+    it("cron path, GitHub user not linked (author null) → no author_login in notify, email flows into createConflictPR", async () => {
+      const fakeOctokit = makeCronOctokit("cron-author-sha-2", {
+        data: { author: null, commit: { author: { email: "x@y.com" } } },
+      });
+      getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+      loadConfigMock.mockResolvedValue({
+        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        errors: [],
+      });
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValueOnce({
+        outcome: "conflict",
+        source_sha: "cron-author-sha-2",
+        check_run_id: null,
+        check_run_html_url: null,
+      });
+      createConflictPRMock.mockResolvedValue({
+        ok: true,
+        pr_url: "https://gh/pr/21",
+        pr_number: 21,
+        reused: false,
+      });
+
+      await makeRunCascadeWithNoop()(cronJob());
+
+      const ev = notifyEvents.find((e) => e.kind === "cascade_conflict");
+      expect(ev).toBeDefined();
+      expect(ev?.kind === "cascade_conflict" && "author_login" in ev).toBe(false);
+      const prArg = createConflictPRMock.mock.calls[0]![1];
+      expect(prArg.headCommitAuthor.email).toBe("x@y.com");
+    });
+
+    it("cron path, commit API throws → fallback author used, cascade continues, warn logged", async () => {
+      const fakeOctokit = makeCronOctokit("cron-author-sha-3", null, true);
+      getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+      loadConfigMock.mockResolvedValue({
+        config: { main_branch: "main", release_branch: "release", dev_branch: "dev" },
+        errors: [],
+      });
+      buildCascadePlanMock.mockResolvedValue([{ src: "main", tgt: "release" }]);
+      mergeStepMock.mockResolvedValue({ outcome: "merged", sha: "xyz", check_run_id: null });
+
+      await makeRunCascadeWithNoop()(cronJob());
+
+      expect(mergeStepMock).toHaveBeenCalledTimes(1);
+      const warnEvents = warnSpy.mock.calls.map(
+        (c: unknown[]) => (c[0] as { event?: string })?.event,
+      );
+      expect(warnEvents).toContain("cascade_failed_author_resolve");
+    });
+
+    it("push path → commit author API NOT called (author comes from push payload)", async () => {
+      const fakeOctokit = { request: vi.fn() };
+      getInstallationOctokitMock.mockResolvedValue(fakeOctokit as never);
+      buildCascadePlanMock.mockResolvedValue([]);
+
+      await makeRunCascadeWithNoop()(job());
+
+      const commitApiCalls = fakeOctokit.request.mock.calls.filter(
+        (c: unknown[]) => (c[0] as string) === "GET /repos/{owner}/{repo}/commits/{ref}",
+      );
+      expect(commitApiCalls).toHaveLength(0);
+    });
   });
 });

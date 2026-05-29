@@ -107,13 +107,40 @@ async function resolveJobContext(
   }
   sourceShaDedup.mark(dedupKey);
 
+  // Placed after dedup so skipped ticks pay zero API cost for author resolution.
+  let headCommitAuthor: { username: string | null; email: string } = {
+    username: null,
+    email: "(unknown)",
+  };
+  try {
+    const commitResp = await octokit.request("GET /repos/{owner}/{repo}/commits/{ref}", {
+      owner,
+      repo,
+      ref: resolvedSha,
+    });
+    const data = (
+      commitResp as {
+        data: { author: { login?: string } | null; commit: { author: { email?: string } } };
+      }
+    ).data;
+    headCommitAuthor = {
+      username: data.author?.login ?? null,
+      email: data.commit.author.email ?? "(unknown)",
+    };
+  } catch (err) {
+    log.warn(
+      { ...baseLog, err, source_sha: resolvedSha, event: "cascade_failed_author_resolve" },
+      "cascade",
+    );
+  }
+
   const senderLogin = payload.source === "dispatch" ? (payload.sender?.login ?? null) : null;
 
   return {
     after: resolvedSha,
     config,
     branch: config.main_branch,
-    headCommitAuthor: { username: null, email: "(unknown)" },
+    headCommitAuthor,
     senderLogin,
   };
 }
@@ -211,17 +238,34 @@ export function makeRunCascade(deps: { notify: NotificationChannel }): Handler<C
             },
             "cascade",
           );
-          await notify.notify({
-            kind: "cascade_conflict",
-            installation_id,
-            run_id: runId,
-            repo: `${owner}/${repo}`,
-            src,
-            tgt,
-            pr_url: prResult.ok ? prResult.pr_url : "",
-            ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
-            ...(result.check_run_html_url ? { check_run_html_url: result.check_run_html_url } : {}),
-          });
+          // Same-SHA conflict PR already cc'd the author on first creation; re-firing adds no signal.
+          if (prResult.ok && prResult.reused) {
+            log.info(
+              {
+                ...baseLog,
+                src,
+                tgt,
+                pr_url: prResult.pr_url,
+                reason: "pr_reused",
+                event: "cascade_conflict_notification_suppressed",
+              },
+              "cascade",
+            );
+          } else {
+            await notify.notify({
+              kind: "cascade_conflict",
+              installation_id,
+              run_id: runId,
+              repo: `${owner}/${repo}`,
+              src,
+              tgt,
+              pr_url: prResult.ok ? prResult.pr_url : "",
+              ...(headCommitAuthor.username ? { author_login: headCommitAuthor.username } : {}),
+              ...(result.check_run_html_url
+                ? { check_run_html_url: result.check_run_html_url }
+                : {}),
+            });
+          }
           break;
         }
 
