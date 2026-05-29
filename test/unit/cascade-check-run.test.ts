@@ -5,6 +5,7 @@ import {
   completeSuccess,
   createFailureCheckRun,
   createInProgress,
+  findPriorFailureCheckRun,
 } from "../../src/cascade/checkRun.js";
 import { log } from "../../src/log.js";
 
@@ -162,6 +163,78 @@ describe("completeFailure", () => {
     expect(summary.length).toBeLessThanOrEqual(1024 + 32);
     expect(summary).toContain("unknown_error");
     expect(summary).toContain("[truncated]");
+  });
+});
+
+describe("findPriorFailureCheckRun", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns true when a completed-failure run exists for the given name and head_sha", async () => {
+    const requestSpy = vi.fn().mockResolvedValue({
+      data: {
+        check_runs: [
+          { status: "completed", conclusion: "failure" },
+          { status: "completed", conclusion: "success" },
+        ],
+      },
+    });
+    const octokit = { request: requestSpy } as unknown as Octokit;
+
+    const result = await findPriorFailureCheckRun(baseDeps(octokit), {
+      head_sha: "deadbeef",
+      name: "auto-merge: main → release",
+    });
+
+    expect(result).toBe(true);
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+    const [route, params] = requestSpy.mock.calls[0]!;
+    expect(route).toBe("GET /repos/{owner}/{repo}/commits/{ref}/check-runs");
+    expect((params as { ref: string }).ref).toBe("deadbeef");
+    expect((params as { check_name: string }).check_name).toBe("auto-merge: main → release");
+  });
+
+  it("returns false when only an in_progress run exists (our own run must not self-count)", async () => {
+    const requestSpy = vi.fn().mockResolvedValue({
+      data: { check_runs: [{ status: "in_progress", conclusion: null }] },
+    });
+    const octokit = { request: requestSpy } as unknown as Octokit;
+
+    const result = await findPriorFailureCheckRun(baseDeps(octokit), {
+      head_sha: "abc123",
+      name: "auto-merge: main → release",
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false (fail-open) when the API call throws, and emits a warn log", async () => {
+    const requestSpy = vi.fn().mockRejectedValue(new Error("API timeout"));
+    const octokit = { request: requestSpy } as unknown as Octokit;
+    const warnSpy = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+
+    const result = await findPriorFailureCheckRun(baseDeps(octokit), {
+      head_sha: "abc123",
+      name: "auto-merge: main → release",
+    });
+
+    expect(result).toBe(false);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [, msg] = warnSpy.mock.calls[0]!;
+    expect(msg).toBe("find-prior-failure-check-run-failed");
+  });
+
+  it("returns false when check_runs is empty", async () => {
+    const requestSpy = vi.fn().mockResolvedValue({ data: { check_runs: [] } });
+    const octokit = { request: requestSpy } as unknown as Octokit;
+
+    const result = await findPriorFailureCheckRun(baseDeps(octokit), {
+      head_sha: "abc123",
+      name: "auto-merge: main → dev",
+    });
+
+    expect(result).toBe(false);
   });
 });
 

@@ -136,6 +136,31 @@ export async function completeFailure(deps: CheckRunDeps, opts: FailureOpts): Pr
   }
 }
 
+// Fail-open: probe errors must never suppress a real alert; call before completeFailure so in_progress runs are excluded.
+export async function findPriorFailureCheckRun(
+  deps: CheckRunDeps,
+  opts: { head_sha: string; name: string },
+): Promise<boolean> {
+  try {
+    const resp = await deps.octokit.request("GET /repos/{owner}/{repo}/commits/{ref}/check-runs", {
+      owner: deps.owner,
+      repo: deps.repo,
+      ref: opts.head_sha,
+      check_name: opts.name,
+    });
+    const checkRuns = (
+      resp.data as { check_runs: Array<{ status: string; conclusion: string | null }> }
+    ).check_runs;
+    return checkRuns.some((r) => r.status === "completed" && r.conclusion === "failure");
+  } catch (err) {
+    log.warn(
+      { err, owner: deps.owner, repo: deps.repo, head_sha: opts.head_sha, name: opts.name },
+      "find-prior-failure-check-run-failed",
+    );
+    return false;
+  }
+}
+
 export async function createFailureCheckRun(
   deps: CheckRunDeps,
   opts: FailureCheckRunOpts,
