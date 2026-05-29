@@ -6,6 +6,7 @@ import type { Config } from "../../src/config/schema.js";
 const baseConfig: Config = {
   main_branch: "main",
   dev_branch: "dev",
+  conflict_pr: true,
 };
 
 function mockOctokit(impl: (params: unknown) => Promise<unknown>): Octokit {

@@ -112,7 +112,7 @@ describe("loadConfig — default fallback precedence (DEF-03)", () => {
     const result = await loadConfig({ octokit, owner: "o", repo: "r", sha, installation_id: 0 });
 
     expect(result.errors).toHaveLength(0);
-    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(result.config).toEqual({ main_branch: "main", dev_branch: "dev", conflict_pr: true });
     expect(result.source).toBe("repo");
     expect(getRepoConfigSource("o", "r")).toBe("repo");
     expect(checkRunCallCount).toBe(0);

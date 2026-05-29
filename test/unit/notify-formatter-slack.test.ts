@@ -147,6 +147,60 @@ describe("formatSlack — config_invalid", () => {
   });
 });
 
+describe("formatSlack — empty pr_url omits PR link", () => {
+  it("cascade_conflict + empty pr_url → no PR created link in output", () => {
+    const out = formatSlack({
+      kind: "cascade_conflict",
+      run_id: "run1",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "release",
+      pr_url: "",
+    });
+    expect(out).not.toContain("|PR created>");
+    expect(out).not.toContain("<|");
+  });
+
+  it("cascade_conflict + non-empty pr_url → PR created link present", () => {
+    const out = formatSlack({
+      kind: "cascade_conflict",
+      run_id: "run1",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "release",
+      pr_url: "https://github.com/owner/repo/pull/5",
+    });
+    expect(out).toContain("<https://github.com/owner/repo/pull/5|PR created>");
+  });
+
+  it("protection_blocked + empty pr_url → no View PR link in output", () => {
+    const out = formatSlack({
+      kind: "protection_blocked",
+      run_id: "run2",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "dev",
+      pr_url: "",
+      rule: "required_status_checks",
+    });
+    expect(out).not.toContain("|View PR>");
+    expect(out).not.toContain("<|");
+  });
+
+  it("protection_blocked + non-empty pr_url → View PR link present", () => {
+    const out = formatSlack({
+      kind: "protection_blocked",
+      run_id: "run2",
+      repo: "owner/repo",
+      src: "main",
+      tgt: "dev",
+      pr_url: "https://github.com/owner/repo/pull/6",
+      rule: "required_status_checks",
+    });
+    expect(out).toContain("<https://github.com/owner/repo/pull/6|View PR>");
+  });
+});
+
 describe("formatSlack — link syntax correctness", () => {
   it("cascade_conflict PR link uses raw URL without escaping angle brackets or pipe", () => {
     const out = formatSlack({

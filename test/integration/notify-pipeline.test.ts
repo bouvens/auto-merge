@@ -25,6 +25,7 @@ const TELEGRAM_BOT_TOKEN = "test-token";
 const repoConfig: Config = {
   main_branch: "main",
   dev_branch: "dev",
+  conflict_pr: true,
   notifications: {
     slack: { channel: "#test" },
     telegram: { chat_id: "-100123" },
@@ -178,6 +179,7 @@ describe("notify pipeline — integration", () => {
     const configWithoutSlack: Config = {
       main_branch: "main",
       dev_branch: "dev",
+      conflict_pr: true,
       notifications: {
         telegram: { chat_id: "-100123" },
       },

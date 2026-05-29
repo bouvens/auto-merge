@@ -57,6 +57,7 @@ const baseConfig: Config = {
   main_branch: "main",
   release_branch: "release",
   dev_branch: "dev",
+  conflict_pr: true,
 };
 
 function makeHeadCommit(overrides: Partial<PushHeadCommit> = {}): PushHeadCommit {

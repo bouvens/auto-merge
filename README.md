@@ -263,6 +263,7 @@ Each repository managed by auto-merge must have a `.github/auto-merge.yml` file:
 main_branch: main
 release_branch: release   # optional — omit for a two-branch main → dev cascade
 dev_branch: dev
+conflict_pr: true         # false — disable auto-creation of conflict/protection PRs
 notifications:
   slack:
     channel: "#auto-merge-ops"   # overrides the default channel from SLACK_WEBHOOK_URL
@@ -272,6 +273,12 @@ notifications:
 
 The `notifications` block is optional. When absent, notifications go to the default
 channel/chat set by env vars.
+
+`conflict_pr` defaults to `true`. When set to `false`, a conflict or
+protection-blocked outcome does **not** open a PR — the App still records a failure
+Check Run and sends the Slack/Telegram notification, deduped per source commit so
+cron re-sweeps on the same stuck SHA stay quiet. Useful for teams that run their own
+sync process and do not want auto-generated conflict PRs.
 
 Config is validated on every push. An invalid config produces a `failure` Check Run
 and (if notify is configured) a `config_invalid` notification.

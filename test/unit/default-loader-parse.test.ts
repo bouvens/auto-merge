@@ -47,7 +47,7 @@ describe("createDefaultConfigLoader — boot/parse paths", () => {
     activeLoader = loader;
     const got = loader.get();
     expect(got?.source).toBe("file_default");
-    expect(got?.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(got?.config).toEqual({ main_branch: "main", dev_branch: "dev", conflict_pr: true });
     expect(log.info).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "default_config_loaded",
@@ -68,7 +68,7 @@ describe("createDefaultConfigLoader — boot/parse paths", () => {
     activeLoader = loader;
     const got = loader.get();
     expect(got?.source).toBe("env_default");
-    expect(got?.config).toEqual({ main_branch: "main", dev_branch: "dev" });
+    expect(got?.config).toEqual({ main_branch: "main", dev_branch: "dev", conflict_pr: true });
     const infoCall = (log.info as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
       (c) => (c[0] as { event?: string })?.event === "default_config_loaded",
     );

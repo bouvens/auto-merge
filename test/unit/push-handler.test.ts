@@ -23,6 +23,7 @@ const config = {
   main_branch: "main",
   release_branch: "release",
   dev_branch: "dev",
+  conflict_pr: true,
 };
 
 function makeQueue(): MultiQueue<CascadeJob> & {
