@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { Env } from "../../src/env.js";
+import type { Env, FullEnv } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { createNotifyHealthChecker, type NotifyStatus } from "../../src/notify/healthCheck.js";
 import { buildServer } from "../../src/server.js";
@@ -11,8 +11,9 @@ const SLACK_URL = "https://hooks.slack.com/services/T/B/X";
 const TELEGRAM_TOKEN = "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi";
 const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 
-function makeEnv(overrides: Partial<Env>): Env {
+function makeEnv(overrides: Partial<FullEnv>): FullEnv {
   return {
+    _setupOnly: false,
     APP_ID: 1,
     WEBHOOK_SECRET: "test-secret-1234567890",
     PORT: 3010,

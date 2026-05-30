@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
 import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
-const fakeEnv: Env = {
+const fakeEnv: FullEnv = {
+  _setupOnly: false,
   APP_ID: 1,
   WEBHOOK_SECRET: "test-secret-1234567890",
   PORT: 3002,

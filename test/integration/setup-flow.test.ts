@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Env } from "../../src/env.js";
+import type { FullEnv } from "../../src/env.js";
 import { initLogger } from "../../src/log.js";
 import { buildServer } from "../../src/server.js";
 import { createCredentialsStore } from "../../src/setup/credentials.js";
@@ -15,8 +15,9 @@ import { diagnoseDepsStub } from "../helpers/diagnose-deps.js";
 
 const noopLog = initLogger({ LOG_LEVEL: "error", NODE_ENV: "test" });
 
-function makeEnv(overrides: Partial<Env>): Env {
+function makeEnv(overrides: Partial<FullEnv>): FullEnv {
   return {
+    _setupOnly: false,
     APP_ID: 1,
     WEBHOOK_SECRET: "test-secret-1234567890",
     PORT: 3010,

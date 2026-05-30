@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { Octokit } from "@octokit/core";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { FullEnv } from "../../src/env.js";
 
 let validPem: string;
 beforeAll(() => {
@@ -18,8 +19,9 @@ afterEach(() => {
   vi.resetModules();
 });
 
-function makeEnv() {
+function makeEnv(): FullEnv {
   return {
+    _setupOnly: false,
     APP_ID: 12345,
     PRIVATE_KEY: validPem,
     WEBHOOK_SECRET: "test-webhook-secret-32-chars-long",

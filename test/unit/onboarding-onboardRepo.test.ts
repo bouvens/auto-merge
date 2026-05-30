@@ -8,6 +8,13 @@ function httpError(status: number, message = "err"): Error {
   return Object.assign(new Error(message), { status });
 }
 
+type FactoryOctokit = Parameters<typeof onboardRepo>[0]["octokitFactory"] extends (
+  id: number,
+) => Promise<infer O | undefined>
+  ? O
+  : never;
+
+// Intersect with the spy type so tests can read mock.request.mock.calls without re-casting.
 function makeMockOctokit(routes: Record<string, Handler | Handler[]>) {
   const cursors: Record<string, number> = {};
   const request = vi.fn(async (route: string, params: Record<string, unknown>) => {
@@ -21,11 +28,7 @@ function makeMockOctokit(routes: Record<string, Handler | Handler[]>) {
     if (result instanceof Error) throw result;
     return { data: result, status: 200 };
   });
-  return { request } as unknown as Parameters<typeof onboardRepo>[0]["octokitFactory"] extends (
-    id: number,
-  ) => Promise<infer O | undefined>
-    ? O
-    : never;
+  return { request } as unknown as FactoryOctokit & { request: typeof request };
 }
 
 const baseArgs = {
@@ -74,9 +77,7 @@ describe("onboarding/onboardRepo — all branches", () => {
       pr_number: 42,
       pr_url: "https://github.com/acme/widgets/pull/42",
     });
-    const calls = (mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls.map(
-      (c) => c[0],
-    );
+    const calls = mock.request.mock.calls.map((c) => c[0]);
     expect(calls).not.toContain("GET /repos/{owner}/{repo}");
   });
 
@@ -132,9 +133,7 @@ describe("onboarding/onboardRepo — all branches", () => {
       repo: "widgets",
       reason: "config_exists",
     });
-    expect((mock as { request: { mock: { calls: unknown[][] } } }).request.mock.calls).toHaveLength(
-      1,
-    );
+    expect(mock.request.mock.calls).toHaveLength(1);
     expect(infoSpy.mock.calls[0]?.[0]).toMatchObject({ event: "onboard_skipped_config_exists" });
   });
 
