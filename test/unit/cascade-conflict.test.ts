@@ -70,14 +70,15 @@ describe("createConflictPR", () => {
     expect(body).toContain("@alice");
     expect(body).toContain("run_id: 11111111-2222-3333-4444-555555555555");
     expect(body).toContain("Check Run: https://github.com/o/r/runs/42");
-    expect(createCall.params.title).toBe("Auto-merge conflict: main → release (abcdef1)");
-    expect(createCall.params.head).toBe("auto-merge/conflict-main-release-abcdef1");
+    expect(createCall.params.title).toBe("Auto-merge conflict: main → release");
+    expect(createCall.params.head).toBe("auto-merge/conflict-main-release");
     expect(createCall.params.base).toBe("release");
   });
 
   it("createRef 422 + open PR exists → reused=true, pulls.create NOT called", async () => {
     const oc = makeOctokit({
       "POST /repos/{owner}/{repo}/git/refs": [{ __throw: { status: 422 } }],
+      "PATCH /repos/{owner}/{repo}/git/refs/{ref}": [{ status: 200, data: {} }],
       "GET /repos/{owner}/{repo}/pulls": [
         {
           status: 200,
@@ -94,13 +95,14 @@ describe("createConflictPR", () => {
     });
     expect(oc.calls.some((c) => c.route === "POST /repos/{owner}/{repo}/pulls")).toBe(false);
     const listCall = oc.calls.find((c) => c.route === "GET /repos/{owner}/{repo}/pulls")!;
-    expect(listCall.params.head).toBe("o:auto-merge/conflict-main-release-abcdef1");
+    expect(listCall.params.head).toBe("o:auto-merge/conflict-main-release");
     expect(listCall.params.state).toBe("open");
   });
 
   it("createRef 422 + no open PR → creates new PR on same ref, reused=false", async () => {
     const oc = makeOctokit({
       "POST /repos/{owner}/{repo}/git/refs": [{ __throw: { status: 422 } }],
+      "PATCH /repos/{owner}/{repo}/git/refs/{ref}": [{ status: 200, data: {} }],
       "GET /repos/{owner}/{repo}/pulls": [{ status: 200, data: [] }],
       "POST /repos/{owner}/{repo}/pulls": [
         { status: 201, data: { html_url: "https://github.com/o/r/pull/9", number: 9 } },

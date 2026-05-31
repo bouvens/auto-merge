@@ -262,6 +262,10 @@ export function setupMswGitHub(initial: Partial<GitHubMockState> = {}): MswGitHu
       return HttpResponse.json({ ref, object: { sha: "ref-sha" } }, { status: 201 });
     }),
 
+    http.patch("https://api.github.com/repos/:owner/:repo/git/refs/*", () =>
+      HttpResponse.json({ ref: "updated", object: { sha: "ref-sha" } }, { status: 200 }),
+    ),
+
     http.get("https://api.github.com/repos/:owner/:repo/pulls", ({ request }) => {
       pullsListCalls.push({ method: "GET", url: request.url });
       const url = new URL(request.url);

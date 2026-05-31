@@ -27,10 +27,6 @@ interface ExistingPR {
   number: number;
 }
 
-function shortSha(sha: string): string {
-  return sha.slice(0, 7);
-}
-
 function statusOf(err: unknown): number | undefined {
   return (err as { status?: number }).status;
 }
@@ -79,7 +75,7 @@ async function resolveAuthor(deps: ConflictPRDeps, opts: ConflictPROpts): Promis
 function composeBody(opts: ConflictPROpts, mention: string): string {
   const checkRunLine = opts.checkRunHtmlUrl ?? "(not available)";
   const lines = [
-    `Auto-merge \`${opts.src}\` → \`${opts.tgt}\` failed on commit \`${shortSha(opts.source_sha)}\` (cc ${mention}).`,
+    `Auto-merge \`${opts.src}\` → \`${opts.tgt}\` failed (cc ${mention}).`,
     `run_id: ${opts.runId}`,
     `Check Run: ${checkRunLine}`,
   ];
@@ -93,8 +89,7 @@ export async function createConflictPR(
   deps: ConflictPRDeps,
   opts: ConflictPROpts,
 ): Promise<ConflictPRResult> {
-  const shaShort = shortSha(opts.source_sha);
-  const branch = `auto-merge/conflict-${opts.src}-${opts.tgt}-${shaShort}`;
+  const branch = `auto-merge/conflict-${opts.src}-${opts.tgt}`;
   const logCtx = {
     owner: deps.owner,
     repo: deps.repo,
@@ -115,13 +110,26 @@ export async function createConflictPR(
     });
     log.info(logCtx, "cascade_conflict_branch_created");
   } catch (err) {
-    // 422 from createRef is the expected idempotency signal — same source SHA yields the same branch name.
+    // 422 = the per-pair branch already exists from an earlier unresolved conflict.
     if (statusOf(err) !== 422) {
       log.error({ ...logCtx, err }, "cascade_conflict_pr_failed");
       return { ok: false, error: `createRef failed: ${messageOf(err)}` };
     }
     branchExisted = true;
-    log.info(logCtx, "cascade_conflict_branch_exists");
+    // Reused branch may point at a prior conflict's SHA; move it to the current one so the PR shows the live conflict.
+    try {
+      await deps.octokit.request("PATCH /repos/{owner}/{repo}/git/refs/{ref}", {
+        owner: deps.owner,
+        repo: deps.repo,
+        ref: `heads/${branch}`,
+        sha: opts.source_sha,
+        force: true,
+      });
+      log.info(logCtx, "cascade_conflict_branch_updated");
+    } catch (updateErr) {
+      log.error({ ...logCtx, err: updateErr }, "cascade_conflict_pr_failed");
+      return { ok: false, error: `updateRef failed: ${messageOf(updateErr)}` };
+    }
   }
 
   if (branchExisted) {
@@ -139,7 +147,7 @@ export async function createConflictPR(
 
   const mention = await resolveAuthor(deps, opts);
   const body = composeBody(opts, mention);
-  const title = `Auto-merge conflict: ${opts.src} → ${opts.tgt} (${shaShort})`;
+  const title = `Auto-merge conflict: ${opts.src} → ${opts.tgt}`;
 
   try {
     const resp = await deps.octokit.request("POST /repos/{owner}/{repo}/pulls", {
