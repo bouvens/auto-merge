@@ -110,13 +110,26 @@ export async function createConflictPR(
     });
     log.info(logCtx, "cascade_conflict_branch_created");
   } catch (err) {
-    // 422 = the per-pair branch already exists from an earlier unresolved conflict; reuse its open PR.
+    // 422 = the per-pair branch already exists from an earlier unresolved conflict.
     if (statusOf(err) !== 422) {
       log.error({ ...logCtx, err }, "cascade_conflict_pr_failed");
       return { ok: false, error: `createRef failed: ${messageOf(err)}` };
     }
     branchExisted = true;
-    log.info(logCtx, "cascade_conflict_branch_exists");
+    // Reused branch may point at a prior conflict's SHA; move it to the current one so the PR shows the live conflict.
+    try {
+      await deps.octokit.request("PATCH /repos/{owner}/{repo}/git/refs/{ref}", {
+        owner: deps.owner,
+        repo: deps.repo,
+        ref: `heads/${branch}`,
+        sha: opts.source_sha,
+        force: true,
+      });
+      log.info(logCtx, "cascade_conflict_branch_updated");
+    } catch (updateErr) {
+      log.error({ ...logCtx, err: updateErr }, "cascade_conflict_pr_failed");
+      return { ok: false, error: `updateRef failed: ${messageOf(updateErr)}` };
+    }
   }
 
   if (branchExisted) {
