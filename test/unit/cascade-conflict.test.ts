@@ -71,7 +71,7 @@ describe("createConflictPR", () => {
     expect(body).toContain("run_id: 11111111-2222-3333-4444-555555555555");
     expect(body).toContain("Check Run: https://github.com/o/r/runs/42");
     expect(createCall.params.title).toBe("Auto-merge conflict: main → release (abcdef1)");
-    expect(createCall.params.head).toBe("auto-merge/conflict-main-release-abcdef1");
+    expect(createCall.params.head).toBe("auto-merge/conflict-main-release");
     expect(createCall.params.base).toBe("release");
   });
 
@@ -94,7 +94,7 @@ describe("createConflictPR", () => {
     });
     expect(oc.calls.some((c) => c.route === "POST /repos/{owner}/{repo}/pulls")).toBe(false);
     const listCall = oc.calls.find((c) => c.route === "GET /repos/{owner}/{repo}/pulls")!;
-    expect(listCall.params.head).toBe("o:auto-merge/conflict-main-release-abcdef1");
+    expect(listCall.params.head).toBe("o:auto-merge/conflict-main-release");
     expect(listCall.params.state).toBe("open");
   });
 

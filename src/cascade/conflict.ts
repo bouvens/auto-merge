@@ -94,7 +94,7 @@ export async function createConflictPR(
   opts: ConflictPROpts,
 ): Promise<ConflictPRResult> {
   const shaShort = shortSha(opts.source_sha);
-  const branch = `auto-merge/conflict-${opts.src}-${opts.tgt}-${shaShort}`;
+  const branch = `auto-merge/conflict-${opts.src}-${opts.tgt}`;
   const logCtx = {
     owner: deps.owner,
     repo: deps.repo,

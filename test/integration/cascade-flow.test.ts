@@ -223,7 +223,7 @@ describe("cascade-flow integration (msw + real Octokit)", () => {
       {
         html_url: "https://github.com/acme/widgets/pull/77",
         number: 77,
-        head: { ref: "auto-merge/conflict-main-release-after-s" },
+        head: { ref: "auto-merge/conflict-main-release" },
         base: { ref: "release" },
       },
     ];
