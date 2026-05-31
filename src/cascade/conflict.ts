@@ -115,7 +115,7 @@ export async function createConflictPR(
     });
     log.info(logCtx, "cascade_conflict_branch_created");
   } catch (err) {
-    // 422 from createRef is the expected idempotency signal — same source SHA yields the same branch name.
+    // 422 = the per-pair branch already exists from an earlier unresolved conflict; reuse its open PR.
     if (statusOf(err) !== 422) {
       log.error({ ...logCtx, err }, "cascade_conflict_pr_failed");
       return { ok: false, error: `createRef failed: ${messageOf(err)}` };
