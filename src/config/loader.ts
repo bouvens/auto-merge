@@ -15,6 +15,11 @@ export interface ConfigError {
 
 export type ConfigSource = "repo" | "file_default" | "env_default";
 
+// Transient upstream failure (GitHub 5xx/429 or network error) — not a broken config, so must not alert.
+function isTransientFetchError(status: number | undefined): boolean {
+  return status === undefined || status >= 500 || status === 429;
+}
+
 // Immutable per (owner, repo, sha) — same SHA always yields same content, no invalidation needed (D-16).
 const cache = new LRUCache<string, Config>({
   max: 500,
@@ -128,6 +133,20 @@ export async function loadConfig(deps: {
         );
         return { config: fallback.config, errors: [], source: fallback.source };
       }
+    }
+    if (isTransientFetchError(status)) {
+      log.warn(
+        {
+          event: "config_fetch_transient",
+          owner: deps.owner,
+          repo: deps.repo,
+          status: status ?? null,
+        },
+        "config",
+      );
+      return {
+        errors: [{ line: 1, col: 1, message: "transient upstream failure fetching config" }],
+      };
     }
     const message = err instanceof Error ? err.message : String(err);
     const errors: ConfigError[] = [
