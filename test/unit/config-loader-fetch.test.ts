@@ -11,8 +11,12 @@ import { log } from "../../src/log.js";
 
 const createFailureCheckRunMock = vi.mocked(createFailureCheckRun);
 
-function makeErrOctokit(status?: number) {
-  const err = Object.assign(new Error("boom"), status === undefined ? {} : { status });
+function makeErrOctokit(status?: number, headers?: Record<string, string>) {
+  const err = Object.assign(
+    new Error("boom"),
+    status === undefined ? {} : { status },
+    headers ? { response: { headers } } : {},
+  );
   return { request: vi.fn().mockRejectedValue(err) } as never;
 }
 
@@ -39,19 +43,30 @@ beforeEach(() => {
 
 describe("loadConfig — transient upstream failure must not alert as invalid config", () => {
   it.each([
-    ["500 (GitHub Unicorn)", 500, "sha-500"],
-    ["502", 502, "sha-502"],
-    ["429 (rate limit)", 429, "sha-429"],
-    ["network error / no HTTP status", undefined, "sha-net"],
-  ])("%s → no notify, no Check Run, returns errors", async (_label, status, sha) => {
-    const { result, notify } = await run(makeErrOctokit(status), sha);
+    ["500 (GitHub Unicorn)", 500, "sha-500", undefined],
+    ["502", 502, "sha-502", undefined],
+    ["429 (rate limit)", 429, "sha-429", undefined],
+    ["network error / no HTTP status", undefined, "sha-net", undefined],
+    [
+      "403 primary rate limit (x-ratelimit-remaining:0)",
+      403,
+      "sha-rl",
+      { "x-ratelimit-remaining": "0" },
+    ],
+    ["403 secondary rate limit (retry-after)", 403, "sha-sec", { "retry-after": "60" }],
+  ])("%s → no notify, no Check Run, warns transient", async (_label, status, sha, headers) => {
+    const { result, notify } = await run(makeErrOctokit(status, headers), sha);
     expect(result.config).toBeUndefined();
     expect(result.errors.length).toBeGreaterThan(0);
     expect(notify.notify).not.toHaveBeenCalled();
     expect(createFailureCheckRunMock).not.toHaveBeenCalled();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "config_fetch_transient" }),
+      expect.anything(),
+    );
   });
 
-  it("genuine 403 (permission/auth) → alerts config_invalid + Check Run", async () => {
+  it("genuine 403 (permission/auth, no rate-limit headers) → alerts config_invalid + Check Run", async () => {
     const { result, notify } = await run(makeErrOctokit(403), "sha-403");
     expect(result.config).toBeUndefined();
     expect(notify.notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "config_invalid" }));
