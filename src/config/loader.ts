@@ -15,6 +15,18 @@ export interface ConfigError {
 
 export type ConfigSource = "repo" | "file_default" | "env_default";
 
+// Transient upstream failure (5xx/429, network drop, rate-limited 403) — not a broken config, must not alert.
+function isTransientFetchError(err: unknown): boolean {
+  const status = (err as { status?: number }).status;
+  if (status === undefined || status >= 500 || status === 429) return true;
+  if (status === 403) {
+    const headers =
+      (err as { response?: { headers?: Record<string, unknown> } }).response?.headers ?? {};
+    return String(headers["x-ratelimit-remaining"]) === "0" || headers["retry-after"] != null;
+  }
+  return false;
+}
+
 // Immutable per (owner, repo, sha) — same SHA always yields same content, no invalidation needed (D-16).
 const cache = new LRUCache<string, Config>({
   max: 500,
@@ -128,6 +140,20 @@ export async function loadConfig(deps: {
         );
         return { config: fallback.config, errors: [], source: fallback.source };
       }
+    }
+    if (isTransientFetchError(err)) {
+      log.warn(
+        {
+          event: "config_fetch_transient",
+          owner: deps.owner,
+          repo: deps.repo,
+          status: status ?? null,
+        },
+        "config",
+      );
+      return {
+        errors: [{ line: 1, col: 1, message: "transient upstream failure fetching config" }],
+      };
     }
     const message = err instanceof Error ? err.message : String(err);
     const errors: ConfigError[] = [
